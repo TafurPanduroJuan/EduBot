@@ -1,0 +1,27 @@
+# render.yaml — Configuración de deploy automático en Render
+# Documentación: https://render.com/docs/render-yaml
+
+services:
+  - type: web
+    name: edubot-backend
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free              # Cambia a "starter" para producción real
+    region: oregon          # Elige la región más cercana a tus usuarios
+
+    # Variables de entorno — configura los valores secretos en el dashboard de Render
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: DATABASE_URL
+        sync: false          # Valor secreto — ingrésalo manualmente en el dashboard
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DDL_AUTO
+        value: validate      # Usa "update" solo en el primer deploy, luego cambia a "validate"
+      - key: CORS_ORIGINS
+        sync: false          # Ejemplo: http://localhost:5173,https://edubot.vercel.app
+
+    healthCheckPath: /api/edubot/health
