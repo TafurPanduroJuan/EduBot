@@ -343,13 +343,14 @@ export default function EduBotChat() {
         return;
       }
 
+      const motivoCapturado = opt; // capturamos el motivo en el closure
       addMsg({
         from: 'bot',
         card: (
           <TarjetaPrediccionIA
             slots={data.sugerenciasIA}
             docenteNombre={docenteElegido.nombre}
-            onSelect={(slot) => handleSlotSelect(slot)}
+            onSelect={(slot) => handleSlotSelect(slot, motivoCapturado)}
             onVerTodos={handleVerTodos}
           />
         ),
@@ -367,7 +368,11 @@ export default function EduBotChat() {
     setPaso(PASOS.SLOT_MANUAL);
   }
 
-  async function handleSlotSelect(slot) {
+  async function handleSlotSelect(slot, motivoParam) {
+    // motivoParam viene del closure cuando se selecciona desde IA
+    // motivo (estado) es el fallback cuando se selecciona desde el calendario manual
+    const motivoUsado = motivoParam || motivo;
+
     addMsg({ from: 'user', text: `${slot.horaInicio} – ${slot.horaFin}` });
     addMsg({ from: 'bot', text: '⏳ Confirmando tu cita...', time: nowTime() });
 
@@ -376,12 +381,12 @@ export default function EduBotChat() {
         padreId: padre.id,
         docenteId: docenteElegido.id,
         disponibilidadId: slot.disponibilidadId,
-        motivo: motivo?.id || motivo?.label,
+        motivo: motivoUsado?.id || motivoUsado?.label || 'rendimiento',
       });
 
       addMsg({
         from: 'bot',
-        card: <TarjetaConfirmacion cita={{ ...resultado, motivo: motivo?.label }} />,
+        card: <TarjetaConfirmacion cita={{ ...resultado, motivo: motivoUsado?.label }} />,
         time: nowTime(),
       });
       setPaso(PASOS.CONFIRMADO);
@@ -460,7 +465,7 @@ export default function EduBotChat() {
             disponibilidad={disp}
             fechaSeleccionada={fechaSelCalendario}
             onSelectFecha={setFechaSelCalendario}
-            onSelectSlot={(slot) => handleSlotSelect(slot)}
+            onSelectSlot={(slot) => handleSlotSelect(slot, motivo)}
           />
         </div>
       );
