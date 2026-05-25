@@ -11,9 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.*;
 
-/**
- * ChatBotController — API principal de EduBot
- */
 @RestController
 @RequestMapping("/api/edubot")
 public class ChatBotController {
@@ -25,13 +22,13 @@ public class ChatBotController {
     @Autowired private DisponibilidadRepository disponibilidadRepository;
     @Autowired private IaPrediccionService iaService;
 
-    // ── 0. Health check (Render lo necesita para saber que el servicio está vivo) ──
+    // ── Health check ──────────────────────────────────────────────────────────
     @GetMapping("/health")
     public ResponseEntity<?> health() {
         return ResponseEntity.ok(Map.of("status", "UP", "service", "EduBot API"));
     }
 
-    // ── 1. Validar padre por DNI (HU002) ──────────────────────────────────────
+    // ── 1. Validar padre por DNI ──────────────────────────────────────────────
     @GetMapping("/padre/{dni}")
     public ResponseEntity<?> validarPadre(@PathVariable String dni) {
         return padreRepository.findByDni(dni)
@@ -51,7 +48,7 @@ public class ChatBotController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // ── 2. Listar docentes activos ────────────────────────────────────────────
+    // ── 2. Listar docentes ────────────────────────────────────────────────────
     @GetMapping("/docentes")
     public ResponseEntity<?> listarDocentes() {
         List<Docente> docentes = docenteRepository.findByActivoTrue();
@@ -65,7 +62,7 @@ public class ChatBotController {
         return ResponseEntity.ok(resultado);
     }
 
-    // ── 3. Obtener sugerencias IA + todos los horarios (HU003) ────────────────
+    // ── 3. Horarios con IA ────────────────────────────────────────────────────
     @GetMapping("/horarios")
     public ResponseEntity<?> obtenerHorarios(
             @RequestParam Long padreId,
@@ -96,18 +93,30 @@ public class ChatBotController {
         return ResponseEntity.ok(resp);
     }
 
-    // ── 4. Confirmar cita (HU001) ─────────────────────────────────────────────
+    // ── 4. Confirmar cita ─────────────────────────────────────────────────────
     @PostMapping("/cita")
     public ResponseEntity<?> confirmarCita(@RequestBody Map<String, Object> body) {
         try {
+            // Validar que todos los campos requeridos estén presentes
+            String[] required = {"padreId", "docenteId", "disponibilidadId", "motivo"};
+            for (String field : required) {
+                if (body.get(field) == null) {
+                    return ResponseEntity.badRequest()
+                            .body(Map.of("error", "Campo requerido faltante: " + field));
+                }
+            }
+
             Long padreId   = Long.parseLong(body.get("padreId").toString());
             Long docenteId = Long.parseLong(body.get("docenteId").toString());
             Long dispId    = Long.parseLong(body.get("disponibilidadId").toString());
             String motivo  = body.get("motivo").toString();
 
-            Padre padre       = padreRepository.findById(padreId).orElseThrow();
-            Docente docente   = docenteRepository.findById(docenteId).orElseThrow();
-            DisponibilidadDocente disp = disponibilidadRepository.findById(dispId).orElseThrow();
+            Padre padre     = padreRepository.findById(padreId).orElseThrow(
+                    () -> new RuntimeException("Padre no encontrado con id: " + padreId));
+            Docente docente = docenteRepository.findById(docenteId).orElseThrow(
+                    () -> new RuntimeException("Docente no encontrado con id: " + docenteId));
+            DisponibilidadDocente disp = disponibilidadRepository.findById(dispId).orElseThrow(
+                    () -> new RuntimeException("Horario no encontrado con id: " + dispId));
 
             if (!disp.isDisponible()) {
                 return ResponseEntity.badRequest()
@@ -140,20 +149,23 @@ public class ChatBotController {
             resp.put("mensaje", "¡Cita confirmada! Recibirás recordatorio 24h y 1h antes.");
 
             return ResponseEntity.ok(resp);
+
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "ID inválido: " + e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 
-    // ── 5. Historial de citas del padre (NUEVO — HU005) ───────────────────────
+    // ── 5. Historial de citas ─────────────────────────────────────────────────
     @GetMapping("/citas/{padreId}")
     public ResponseEntity<?> historialCitas(@PathVariable Long padreId) {
         if (!padreRepository.existsById(padreId)) {
             return ResponseEntity.notFound().build();
         }
-
         List<Cita> citas = citaRepository.findByPadreIdOrderByFechaDesc(padreId);
-
         List<Map<String, Object>> resultado = citas.stream().map(c -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", c.getId());
@@ -167,22 +179,23 @@ public class ChatBotController {
             m.put("estado", c.getEstado());
             return m;
         }).toList();
-
         return ResponseEntity.ok(resultado);
     }
 
-    // ── 6. Cancelar cita (NUEVO) ──────────────────────────────────────────────
+    // ── 6. Cancelar cita ──────────────────────────────────────────────────────
     @PatchMapping("/cita/{citaId}/cancelar")
     public ResponseEntity<?> cancelarCita(
             @PathVariable Long citaId,
             @RequestBody Map<String, Object> body) {
         try {
+            if (body.get("padreId") == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "padreId requerido"));
+            }
             Long padreId = Long.parseLong(body.get("padreId").toString());
 
             Cita cita = citaRepository.findById(citaId).orElse(null);
             if (cita == null) return ResponseEntity.notFound().build();
 
-            // Verificar que la cita pertenece al padre
             if (!cita.getPadre().getId().equals(padreId)) {
                 return ResponseEntity.status(403)
                         .body(Map.of("error", "No tienes permiso para cancelar esta cita."));
@@ -191,21 +204,6 @@ public class ChatBotController {
             if ("cancelada".equals(cita.getEstado()) || "completada".equals(cita.getEstado())) {
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Esta cita ya no puede cancelarse (estado: " + cita.getEstado() + ")."));
-            }
-
-            // Liberar la franja horaria
-            DisponibilidadDocente disp = disponibilidadRepository
-                    .findByDocenteIdAndFechaGreaterThanEqualAndDisponibleTrue(
-                            cita.getDocente().getId(), cita.getFecha())
-                    .stream()
-                    .filter(d -> d.getHoraInicio().equals(cita.getHoraInicio()))
-                    .findFirst()
-                    .orElse(null);
-
-            // Intentamos liberar la franja si aún existe
-            if (disp != null) {
-                disp.setDisponible(true);
-                disponibilidadRepository.save(disp);
             }
 
             cita.setEstado("cancelada");
