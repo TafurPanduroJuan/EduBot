@@ -413,6 +413,7 @@ export default function EduBotChat() {
     setInput('');
     addMsg({ from: 'user', text });
 
+    // ── Paso: ingreso de DNI ───────────────────────────────────────────────
     if (paso === PASOS.IDENTIFICAR || paso === 'identificar_miscitas') {
       const dni = text.replace(/\D/g, '');
       if (dni.length >= 7) {
@@ -424,7 +425,43 @@ export default function EduBotChat() {
       return;
     }
 
-    await botMsg('Escribe "Cita" para agendar una reunión, o usa los botones de abajo. 😊');
+    // ── Detector de intención por palabras clave ───────────────────────────
+    const normalizar = (s) =>
+      s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const txt = normalizar(text);
+
+    const intentCita     = /\b(cita|agendar|reunion|reunión|docente|profesor|hablar|quiero|necesito)\b/.test(txt);
+    const intentMisCitas = /\b(mis citas|ver citas|mis reuniones|historial|cancelar)\b/.test(txt)
+                           || txt === 'citas';
+    const intentAyuda    = /\b(ayuda|help|que puedes|que haces|opciones|menu)\b/.test(txt);
+
+    if (paso === PASOS.INICIO || paso === PASOS.CONFIRMADO) {
+      if (intentMisCitas) {
+        await handleMenuSelect({ id: 'miscitas', label: 'Mis citas' });
+        return;
+      }
+      if (intentCita) {
+        await handleMenuSelect({ id: 'cita', label: 'Agendar cita' });
+        return;
+      }
+      if (intentAyuda) {
+        await handleMenuSelect({ id: 'ayuda', label: 'Ayuda' });
+        return;
+      }
+    }
+
+    // ── Fallback contextual según el paso actual ───────────────────────────
+    const sugerenciaPaso = {
+      [PASOS.ELEGIR_DOCENTE]: 'Usa los botones de abajo para elegir un docente. 👇',
+      [PASOS.ELEGIR_MOTIVO]:  'Selecciona el motivo de la cita con los botones. 👇',
+      [PASOS.IA_SUGERENCIA]:  'Elige un horario sugerido o presiona "Ver todos". 👇',
+      [PASOS.SLOT_MANUAL]:    'Selecciona una fecha disponible en el calendario. 👇',
+    };
+
+    const msg = sugerenciaPaso[paso]
+      ?? 'No entendí eso. Puedes escribir "Cita" para agendar o "Mis citas" para ver tus reuniones. 😊';
+
+    await botMsg(msg);
   }
 
   // Construir mapa de disponibilidad para el selector manual
