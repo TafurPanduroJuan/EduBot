@@ -8,7 +8,10 @@ import com.edubot.repository.CitaRepository;
 import com.edubot.repository.DisponibilidadRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -19,14 +22,27 @@ public class AIServiceImpl implements AIService {
 
     private static final Logger log = LoggerFactory.getLogger(AIServiceImpl.class);
 
+    @Value("${anthropic.api.key:}")
+    private String anthropicApiKey;
+
+    @Value("${anthropic.api.url:https://api.anthropic.com/v1/messages}")
+    private String anthropicApiUrl;
+
+    @Value("${anthropic.api.model:claude-3-haiku-20240307}")
+    private String anthropicModel;
+
     private final CitaRepository citaRepository;
     private final DisponibilidadRepository disponibilidadRepository;
+    private final RestTemplate restTemplate;
 
     public AIServiceImpl(CitaRepository citaRepository,
                          DisponibilidadRepository disponibilidadRepository) {
         this.citaRepository = citaRepository;
         this.disponibilidadRepository = disponibilidadRepository;
+        this.restTemplate = new RestTemplate();
     }
+
+    // ── sugerirHorarios ───────────────────────────────────────────────────────
 
     @Override
     public List<HorarioSugeridoDTO> sugerirHorarios(Padre padre, Long docenteId, String motivo) {
@@ -52,12 +68,20 @@ public class AIServiceImpl implements AIService {
         return sugeridos.subList(0, Math.min(3, sugeridos.size()));
     }
 
+    // ── generarMensajeBienvenida (API real) ───────────────────────────────────
+
     @Override
     public String generarMensajeBienvenida(String nombrePadre, String motivo) {
-        // Placeholder — se conecta a API real en el siguiente commit
-        return String.format(
-            "Hola %s, bienvenido a EduBot. Te ayudaremos a agendar tu cita por \"%s\".",
-            nombrePadre, motivo);
+        if (anthropicApiKey == null || anthropicApiKey.isBlank()) {
+            log.warn("[AIService] ANTHROPIC_API_KEY no configurada — usando mensaje local.");
+            return buildMensajeFallback(nombrePadre, motivo);
+        }
+        try {
+            return llamarAnthropicAPI(nombrePadre, motivo);
+        } catch (Exception e) {
+            log.error("[AIService] Error llamando a Anthropic API: {}", e.getMessage());
+            return buildMensajeFallback(nombrePadre, motivo);
+        }
     }
 
     // ── Scoring ───────────────────────────────────────────────────────────────
@@ -105,5 +129,45 @@ public class AIServiceImpl implements AIService {
         if (horarioCompatible && score >= 65) return "Fuera de tu horario laboral habitual";
         if (score >= 50)                      return "Popular entre padres con trabajo similar";
         return "Opción disponible con buen acceso";
+    }
+
+    // ── Anthropic API ─────────────────────────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private String llamarAnthropicAPI(String nombrePadre, String motivo) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("x-api-key", anthropicApiKey);
+        headers.set("anthropic-version", "2023-06-01");
+
+        String prompt = String.format(
+            "Eres EduBot, asistente educativo para una escuela. " +
+            "Saluda brevemente y con calidez a %s, padre/madre de familia, " +
+            "que quiere agendar una cita con un docente por motivo: \"%s\". " +
+            "El mensaje debe ser amigable, en español, máximo 2 oraciones.",
+            nombrePadre, motivo);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", anthropicModel);
+        body.put("max_tokens", 120);
+        body.put("messages", List.of(Map.of("role", "user", "content", prompt)));
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        ResponseEntity<Map> response = restTemplate.postForEntity(anthropicApiUrl, request, Map.class);
+
+        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+            List<Map<String, Object>> content =
+                    (List<Map<String, Object>>) response.getBody().get("content");
+            if (content != null && !content.isEmpty()) {
+                return content.get(0).get("text").toString().trim();
+            }
+        }
+        return buildMensajeFallback(nombrePadre, motivo);
+    }
+
+    private String buildMensajeFallback(String nombrePadre, String motivo) {
+        return String.format(
+            "Hola %s, bienvenido a EduBot. Te ayudaremos a agendar tu cita por \"%s\".",
+            nombrePadre, motivo);
     }
 }
