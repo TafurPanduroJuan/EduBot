@@ -1,5 +1,14 @@
 /**
- * api.js — Capa de servicio que conecta el frontend con el backend EduBot.
+ * api.js — Capa de servicio CRUD que conecta el frontend con el backend EduBot.
+ *
+ * Responsabilidad:
+ *   Solo gestiona operaciones de datos (padres, docentes, citas).
+ *   Las operaciones de Inteligencia Artificial están desacopladas en:
+ *   → src/integration/AIService.js
+ *
+ * Arquitectura M-V-C-BD:
+ *   - Baja dependencia entre capas: api.js no conoce lógica de IA.
+ *   - Cada capa tiene una única responsabilidad.
  *
  * En desarrollo: usa http://localhost:8080 (configurable en .env)
  * En producción: usa la URL de Render configurada en VITE_API_URL
@@ -20,6 +29,8 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+// ─── Endpoints CRUD (sin lógica IA) ──────────────────────────────────────────
+
 /** Verifica que el backend esté activo */
 export const checkHealth = () => request('/health');
 
@@ -28,13 +39,6 @@ export const validarPadre = (dni) => request(`/padre/${dni}`);
 
 /** Lista todos los docentes activos */
 export const listarDocentes = () => request('/docentes');
-
-/**
- * Obtiene horarios para un docente dado el padre y motivo.
- * Devuelve { sugerenciasIA: [...], todosLosHorarios: [...] }
- */
-export const obtenerHorarios = (padreId, docenteId, motivo) =>
-  request(`/horarios?padreId=${padreId}&docenteId=${docenteId}&motivo=${motivo}`);
 
 /**
  * Confirma una cita.
@@ -57,3 +61,6 @@ export const cancelarCita = (citaId, padreId) =>
     method: 'PATCH',
     body: JSON.stringify({ padreId }),
   });
+
+// NOTA: obtenerHorarios (con sugerencias IA) ha sido movido a
+//       src/integration/AIService.js → AIService.obtenerSugerencias()

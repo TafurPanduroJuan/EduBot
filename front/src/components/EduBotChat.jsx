@@ -3,9 +3,10 @@ import { motivosCita, generarCodigoCita } from '../data/datosSimulados';
 import {
   validarPadre,
   listarDocentes,
-  obtenerHorarios,
   confirmarCita,
 } from '../services/api';
+// Capa IA desacoplada — separada de los servicios CRUD (Arquitectura M-V-C-BD)
+import AIService from '../integration/AIService';
 import MisCitas from './MisCitas';
 import '../assets/styles/EduBotChat.css';
 
@@ -333,11 +334,21 @@ export default function EduBotChat() {
 
     try {
       setIsTyping(true);
-      const data = await obtenerHorarios(padre.id, docenteElegido.id, opt.id);
+      // Delegamos la lógica IA a la capa de integración independiente (AIService)
+      const data = await AIService.obtenerSugerencias(padre.id, docenteElegido.id, opt.id);
       setIsTyping(false);
-      setHorariosData(data);
+      // Normalizar al formato que usa el estado del componente
+      setHorariosData({
+        sugerenciasIA: data.sugerencias,
+        todosLosHorarios: data.todos,
+      });
 
-      if (data.sugerenciasIA.length === 0) {
+      if (data.error) {
+        await botMsg('⚠️ Hubo un error al obtener los horarios: ' + data.error);
+        return;
+      }
+
+      if (data.sugerencias.length === 0) {
         await botMsg('No hay horarios disponibles para este docente en este momento. Intenta más tarde o elige otro docente.');
         setPaso(PASOS.INICIO);
         return;
@@ -348,7 +359,7 @@ export default function EduBotChat() {
         from: 'bot',
         card: (
           <TarjetaPrediccionIA
-            slots={data.sugerenciasIA}
+            slots={data.sugerencias}
             docenteNombre={docenteElegido.nombre}
             onSelect={(slot) => handleSlotSelect(slot, motivoCapturado)}
             onVerTodos={handleVerTodos}
