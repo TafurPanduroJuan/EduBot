@@ -1,9 +1,9 @@
 package com.edubot.controller;
 
 import com.edubot.dto.HorarioSugeridoDTO;
+import com.edubot.integration.AIService;
 import com.edubot.model.*;
 import com.edubot.repository.*;
-import com.edubot.service.IaPrediccionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,7 +20,10 @@ public class ChatBotController {
     @Autowired private EstudianteRepository estudianteRepository;
     @Autowired private CitaRepository citaRepository;
     @Autowired private DisponibilidadRepository disponibilidadRepository;
-    @Autowired private IaPrediccionService iaService;
+
+    /** Capa IA — el controlador solo conoce la interfaz, nunca la implementación */
+    @Autowired
+    private AIService aiService;
 
     // ── Health check ──────────────────────────────────────────────────────────
     @GetMapping("/health")
@@ -72,7 +75,8 @@ public class ChatBotController {
         Padre padre = padreRepository.findById(padreId).orElse(null);
         if (padre == null) return ResponseEntity.notFound().build();
 
-        List<HorarioSugeridoDTO> sugerencias = iaService.sugerirHorarios(padre, docenteId, motivo);
+        // Delegar a la capa de integración IA — sin acoplamiento directo
+        List<HorarioSugeridoDTO> sugerencias = aiService.sugerirHorarios(padre, docenteId, motivo);
 
         List<DisponibilidadDocente> todos = disponibilidadRepository
                 .findByDocenteIdAndFechaGreaterThanEqualAndDisponibleTrue(docenteId, LocalDate.now());
@@ -86,7 +90,12 @@ public class ChatBotController {
             return m;
         }).toList();
 
+        // Mensaje personalizado generado por IA real
+        String mensajeIA = aiService.generarMensajeBienvenida(
+                padre.getNombre() + " " + padre.getApellido(), motivo);
+
         Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("mensajeIA", mensajeIA);
         resp.put("sugerenciasIA", sugerencias);
         resp.put("todosLosHorarios", todosFormateados);
 
@@ -97,13 +106,11 @@ public class ChatBotController {
     @PostMapping("/cita")
     public ResponseEntity<?> confirmarCita(@RequestBody Map<String, Object> body) {
         try {
-            // Validar que todos los campos requeridos estén presentes
             String[] required = {"padreId", "docenteId", "disponibilidadId", "motivo"};
             for (String field : required) {
-                if (body.get(field) == null) {
+                if (body.get(field) == null)
                     return ResponseEntity.badRequest()
                             .body(Map.of("error", "Campo requerido faltante: " + field));
-                }
             }
 
             Long padreId   = Long.parseLong(body.get("padreId").toString());
@@ -118,10 +125,9 @@ public class ChatBotController {
             DisponibilidadDocente disp = disponibilidadRepository.findById(dispId).orElseThrow(
                     () -> new RuntimeException("Horario no encontrado con id: " + dispId));
 
-            if (!disp.isDisponible()) {
+            if (!disp.isDisponible())
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "El horario ya no está disponible. Por favor elige otro."));
-            }
 
             disp.setDisponible(false);
             disponibilidadRepository.save(disp);
@@ -151,20 +157,17 @@ public class ChatBotController {
             return ResponseEntity.ok(resp);
 
         } catch (NumberFormatException e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", "ID inválido: " + e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", "ID inválido: " + e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     // ── 5. Historial de citas ─────────────────────────────────────────────────
     @GetMapping("/citas/{padreId}")
     public ResponseEntity<?> historialCitas(@PathVariable Long padreId) {
-        if (!padreRepository.existsById(padreId)) {
-            return ResponseEntity.notFound().build();
-        }
+        if (!padreRepository.existsById(padreId)) return ResponseEntity.notFound().build();
+
         List<Cita> citas = citaRepository.findByPadreIdOrderByFechaDesc(padreId);
         List<Map<String, Object>> resultado = citas.stream().map(c -> {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -188,23 +191,20 @@ public class ChatBotController {
             @PathVariable Long citaId,
             @RequestBody Map<String, Object> body) {
         try {
-            if (body.get("padreId") == null) {
+            if (body.get("padreId") == null)
                 return ResponseEntity.badRequest().body(Map.of("error", "padreId requerido"));
-            }
-            Long padreId = Long.parseLong(body.get("padreId").toString());
 
+            Long padreId = Long.parseLong(body.get("padreId").toString());
             Cita cita = citaRepository.findById(citaId).orElse(null);
             if (cita == null) return ResponseEntity.notFound().build();
 
-            if (!cita.getPadre().getId().equals(padreId)) {
+            if (!cita.getPadre().getId().equals(padreId))
                 return ResponseEntity.status(403)
                         .body(Map.of("error", "No tienes permiso para cancelar esta cita."));
-            }
 
-            if ("cancelada".equals(cita.getEstado()) || "completada".equals(cita.getEstado())) {
+            if ("cancelada".equals(cita.getEstado()) || "completada".equals(cita.getEstado()))
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "Esta cita ya no puede cancelarse (estado: " + cita.getEstado() + ")."));
-            }
 
             cita.setEstado("cancelada");
             citaRepository.save(cita);
@@ -212,8 +212,7 @@ public class ChatBotController {
             return ResponseEntity.ok(Map.of(
                     "mensaje", "Cita cancelada correctamente.",
                     "ticket", cita.getTicket(),
-                    "estado", "cancelada"
-            ));
+                    "estado", "cancelada"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
