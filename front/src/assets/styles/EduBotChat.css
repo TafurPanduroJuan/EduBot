@@ -427,7 +427,11 @@
 .cal-cell.no-disponible { color: var(--text-light); cursor: default; }
 
 /* ── Slot list ── */
-.slots-lista { padding: 10px 0 4px; }
+.slots-lista {
+  padding: 10px 0 4px;
+  display: flex;
+  flex-direction: column;
+}
 .slots-titulo { font-size: 12.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; }
 
 .slot-btn {
@@ -463,6 +467,10 @@
   padding: 12px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
+
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* ════════════════════════════════════════
@@ -589,4 +597,31 @@
   .msg-bubble { max-width: 88%; }
   .ia-slot { flex-direction: column; align-items: flex-start; gap: 6px; }
   .ia-slot-right { align-items: flex-start; flex-direction: row; }
+}
+
+/* =====================================
+   Desktop Responsive - Calendario
+===================================== */
+
+@media (min-width: 992px) {
+
+  .selector-horario{
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .calendario{
+    flex: 0 0 340px;
+  }
+
+  .slots-lista{
+    flex: 1;
+    max-height: 420px;
+    overflow-y: auto;
+    padding-left: 12px;
+  }
+
+  .slot-btn{
+    margin-bottom: 10px;
+  }
 }
