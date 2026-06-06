@@ -63,9 +63,28 @@ CREATE TABLE IF NOT EXISTS citas (
     created_at      TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS usuarios_panel (
+    id          BIGSERIAL PRIMARY KEY,
+    username    VARCHAR(50)  UNIQUE NOT NULL,
+    password    VARCHAR(255) NOT NULL,           -- BCrypt hash
+    rol         VARCHAR(20)  NOT NULL            -- 'DOCENTE' o 'ADMINISTRATIVO'
+                CHECK (rol IN ('DOCENTE', 'ADMINISTRATIVO')),
+    docente_id  BIGINT REFERENCES docentes(id),  -- NULL si es ADMINISTRATIVO
+    activo      BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+
 -- Índices
 CREATE INDEX IF NOT EXISTS idx_citas_padre       ON citas(padre_id);
 CREATE INDEX IF NOT EXISTS idx_citas_docente     ON citas(docente_id);
 CREATE INDEX IF NOT EXISTS idx_citas_fecha       ON citas(fecha);
 CREATE INDEX IF NOT EXISTS idx_disp_docente      ON disponibilidad_docente(docente_id, fecha);
+
+-- Índice para búsquedas por username (login)
+CREATE INDEX IF NOT EXISTS idx_usuarios_panel_username ON usuarios_panel(username);
+
+-- Índice para buscar el usuario de un docente específico
+CREATE INDEX IF NOT EXISTS idx_usuarios_panel_docente ON usuarios_panel(docente_id);
+
 
