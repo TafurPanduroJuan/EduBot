@@ -1,22 +1,7 @@
-/**
- * api.js — Capa de servicio CRUD que conecta el frontend con el backend EduBot.
- *
- * Responsabilidad:
- *   Solo gestiona operaciones de datos (padres, docentes, citas).
- *   Las operaciones de Inteligencia Artificial están desacopladas en:
- *   → src/integration/AIService.js
- *
- * Arquitectura M-V-C-BD:
- *   - Baja dependencia entre capas: api.js no conoce lógica de IA.
- *   - Cada capa tiene una única responsabilidad.
- *
- * En desarrollo: usa http://localhost:8080 (configurable en .env)
- * En producción: usa la URL de Render configurada en VITE_API_URL
- */
-
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-const API = `${BASE_URL}/api/edubot`;
+const API = `${BASE_URL}/api`;
 
+// Helper genérico
 async function request(path, options = {}) {
   const res = await fetch(`${API}${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -29,38 +14,40 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// ─── Endpoints CRUD (sin lógica IA) ──────────────────────────────────────────
+// ==================== PANEL DOCENTE ====================
 
-/** Verifica que el backend esté activo */
-export const checkHealth = () => request('/health');
+/** Login panel */
+export const loginPanel = (credentials) => 
+  request('/panel/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
 
-/** Valida un padre por DNI. Devuelve { id, nombre, apellido, nombreEstudiante, gradoEstudiante } */
-export const validarPadre = (dni) => request(`/padre/${dni}`);
+/** Obtener disponibilidad del docente autenticado */
+export const obtenerDisponibilidadDocente = () => 
+  request('/panel/docente/disponibilidad');
 
-/** Lista todos los docentes activos */
-export const listarDocentes = () => request('/docentes');
+/** Guardar bloques de disponibilidad */
+export const guardarDisponibilidad = (body) => 
+  request('/panel/docente/disponibilidad', { method: 'POST', body: JSON.stringify(body) });
 
-/**
- * Confirma una cita.
- * @param {{ padreId, docenteId, disponibilidadId, motivo }} body
- * @returns {{ ticket, citaId, docente, curso, fecha, horaInicio, horaFin, motivo, mensaje }}
- */
-export const confirmarCita = (body) =>
-  request('/cita', { method: 'POST', body: JSON.stringify(body) });
+/** Sugerir bloques con IA */
+export const sugerirDisponibilidadIA = () => 
+  request('/panel/docente/disponibilidad/sugerir');
 
-/** Historial de citas de un padre */
-export const obtenerCitasPadre = (padreId) => request(`/citas/${padreId}`);
+/** Obtener citas pendientes del docente */
+export const obtenerCitasPendientesDocente = () => 
+  request('/panel/docente/citas-pendientes'); // (crearemos mock por ahora)
 
-/**
- * Cancela una cita.
- * @param {number} citaId
- * @param {number} padreId
- */
-export const cancelarCita = (citaId, padreId) =>
-  request(`/cita/${citaId}/cancelar`, {
-    method: 'PATCH',
-    body: JSON.stringify({ padreId }),
+/** Obtener briefing IA de una cita */
+export const obtenerBriefingCita = (citaId) => 
+  request(`/edubot/cita/${citaId}/contexto`);
+
+/** Generar Acta PDF */
+export const generarActa = (citaId, notasLibres) => 
+  request(`/edubot/cita/${citaId}/acta`, { 
+    method: 'POST', 
+    body: JSON.stringify({ notasLibres }) 
   });
 
-// NOTA: obtenerHorarios (con sugerencias IA) ha sido movido a
-//       src/integration/AIService.js → AIService.obtenerSugerencias()
+export { 
+  validarPadre, listarDocentes, confirmarCita, 
+  obtenerCitasPadre, cancelarCita 
+} from './api.js'; // mantén lo anterior
