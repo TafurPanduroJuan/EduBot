@@ -1,47 +1,78 @@
-import React, { useState } from 'react'
-import EduBotChat from './components/EduBotChat.jsx'
-import './App.css'
+import React, { useState } from 'react';
+import EduBotChat from './components/EduBotChat.jsx';
+import DocentePanel from './components/DocentePanel.jsx';
+import { loginPanel } from './services/api';
+import './App.css';
 
 export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isDocente, setIsDocente] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const credentials = {
+      username: form.username.value,
+      password: form.password.value
+    };
+
+    try {
+      const resp = await loginPanel(credentials);
+      setUser(resp);
+      setIsLoggedIn(true);
+      setIsDocente(resp.rol === 'DOCENTE');
+      setError('');
+    } catch (err) {
+      setError('Credenciales incorrectas');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUser(null);
+  };
+
+  if (!isLoggedIn) {
+    return (
+      <div className="login-screen">
+        <div className="login-box">
+          <h1>EduBot Panel</h1>
+          <form onSubmit={handleLogin}>
+            <input name="username" placeholder="Usuario (ej: docente_1)" required />
+            <input name="password" type="password" placeholder="Contraseña" required />
+            <button type="submit">Ingresar al Panel</button>
+          </form>
+          {error && <p className="error">{error}</p>}
+          <p style={{marginTop: '20px', fontSize: '14px'}}>
+            Prueba: <strong>docente_1</strong> / <strong>docente1123</strong>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
-      {/* Desktop sidebar */}
       <aside className="app-sidebar">
+        {/* Sidebar igual que antes */}
         <div className="sidebar-header">
-          <div className="sidebar-logo">
-            <span className="logo-icon">E</span>
-          </div>
+          <div className="sidebar-logo"><span>E</span></div>
           <div className="sidebar-info">
-            <h1 className="sidebar-title">EduBot</h1>
-            <p className="sidebar-sub">IE San Martín de Porres</p>
-          </div>
-        </div>
-        <div className="sidebar-desc">
-          <p>Asistente virtual para gestión de citas con docentes.</p>
-          <div className="sidebar-hours">
-            <span>🕐</span> Lun–Vie · 8:00 AM – 4:00 PM
-          </div>
-        </div>
-        <div className="sidebar-features">
-          <div className="feature-item">
-            <span className="feature-icon">📅</span>
-            <span>Agenda citas rápidamente</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">🤖</span>
-            <span>Horarios sugeridos con IA</span>
-          </div>
-          <div className="feature-item">
-            <span className="feature-icon">📄</span>
-            <span>Actas con firma digital OTP</span>
+            <h1>EduBot</h1>
+            <p>IE San Martín de Porres</p>
           </div>
         </div>
       </aside>
 
-      {/* Chat panel */}
       <main className="app-main">
-        <EduBotChat />
+        {isDocente ? (
+          <DocentePanel user={user} onLogout={handleLogout} />
+        ) : (
+          <EduBotChat />
+        )}
       </main>
     </div>
-  )
+  );
 }
