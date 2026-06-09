@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import EduBotChat from './components/EduBotChat.jsx';
 import DocentePanel from './components/DocentePanel.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
-import { loginPanel } from './services/api';
+import { loginPanel, removeToken } from './services/api';
 import './App.css';
 
 // ── Enrutador manual (sin react-router-dom) ───────────────────────────────────
@@ -86,6 +86,7 @@ function PanelApp() {
   };
 
   const handleLogout = () => {
+    removeToken();
     setIsLoggedIn(false);
     setUser(null);
   };
