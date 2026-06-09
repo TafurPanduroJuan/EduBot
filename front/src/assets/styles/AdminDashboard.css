@@ -41,6 +41,22 @@
   color:#7a1635;
 }
 
+.alerta-ia {
+  background: #fff7d6;
+  border-left: 6px solid #f1c40f;
+  padding: 16px;
+  margin: 20px 0;
+  border-radius: 10px;
+}
+
+.alerta-ia h2 {
+  margin: 0 0 10px 0;
+}
+
+.alerta-ia p {
+  margin: 0;
+}
+
 .grafico{
   margin-top:30px;
   background:white;

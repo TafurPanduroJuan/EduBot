@@ -197,6 +197,14 @@ evaluar ampliación de horarios.
 
       </div>
 
+      <div className="alerta-ia">
+        <h2>🤖 Alerta Inteligente IA</h2>
+        <p>
+            Martes 4:00 PM presenta alta demanda de citas.
+            Se recomienda ampliar disponibilidad docente.
+        </p>
+      </div>
+
       <div className="grafico">
 
         <h2>
