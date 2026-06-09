@@ -1,53 +1,84 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const API = `${BASE_URL}/api`;
 
-// Helper genérico
 async function request(path, options = {}) {
   const res = await fetch(`${API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    ...options
   });
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: `Error ${res.status}` }));
+    const err = await res.json().catch(() => ({
+      error: `Error ${res.status}`
+    }));
+
     throw new Error(err.error || `Error ${res.status}`);
   }
+
   return res.json();
 }
 
-// ==================== PANEL DOCENTE ====================
+/* ===================================================
+   EDUBOT CHAT
+=================================================== */
 
-/** Login panel */
-export const loginPanel = (credentials) => 
-  request('/panel/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
+export const validarPadre = (dni) =>
+  request(`/edubot/padre/${dni}`);
 
-/** Obtener disponibilidad del docente autenticado */
-export const obtenerDisponibilidadDocente = () => 
-  request('/panel/docente/disponibilidad');
+export const listarDocentes = () =>
+  request('/edubot/docentes');
 
-/** Guardar bloques de disponibilidad */
-export const guardarDisponibilidad = (body) => 
-  request('/panel/docente/disponibilidad', { method: 'POST', body: JSON.stringify(body) });
-
-/** Sugerir bloques con IA */
-export const sugerirDisponibilidadIA = () => 
-  request('/panel/docente/disponibilidad/sugerir');
-
-/** Obtener citas pendientes del docente */
-export const obtenerCitasPendientesDocente = () => 
-  request('/panel/docente/citas-pendientes'); // (crearemos mock por ahora)
-
-/** Obtener briefing IA de una cita */
-export const obtenerBriefingCita = (citaId) => 
-  request(`/edubot/cita/${citaId}/contexto`);
-
-/** Generar Acta PDF */
-export const generarActa = (citaId, notasLibres) => 
-  request(`/edubot/cita/${citaId}/acta`, { 
-    method: 'POST', 
-    body: JSON.stringify({ notasLibres }) 
+export const confirmarCita = (body) =>
+  request('/edubot/cita', {
+    method: 'POST',
+    body: JSON.stringify(body)
   });
 
-export { 
-  validarPadre, listarDocentes, confirmarCita, 
-  obtenerCitasPadre, cancelarCita 
-} from './api.js'; // mantén lo anterior
+export const obtenerCitasPadre = (padreId) =>
+  request(`/edubot/citas/${padreId}`);
+
+export const cancelarCita = (citaId, padreId) =>
+  request(`/edubot/cita/${citaId}/cancelar`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      padreId
+    })
+  });
+
+/* ===================================================
+   PANEL DOCENTE
+=================================================== */
+
+export const loginPanel = (credentials) =>
+  request('/panel/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(credentials)
+  });
+
+export const obtenerDisponibilidadDocente = () =>
+  request('/panel/docente/disponibilidad');
+
+export const guardarDisponibilidad = (body) =>
+  request('/panel/docente/disponibilidad', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
+export const sugerirDisponibilidadIA = () =>
+  request('/panel/docente/disponibilidad/sugerir');
+
+export const obtenerCitasPendientesDocente = () =>
+  request('/panel/docente/citas-pendientes');
+
+export const obtenerBriefingCita = (citaId) =>
+  request(`/edubot/cita/${citaId}/contexto`);
+
+export const generarActa = (citaId, notasLibres) =>
+  request(`/edubot/cita/${citaId}/acta`, {
+    method: 'POST',
+    body: JSON.stringify({
+      notasLibres
+    })
+  });
