@@ -1,7 +1,9 @@
 package com.edubot.controller;
 
 import com.edubot.dto.DisponibilidadRequest;
+import com.edubot.model.Cita;
 import com.edubot.model.DisponibilidadDocente;
+import com.edubot.repository.CitaRepository;
 import com.edubot.service.DisponibilidadService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -9,19 +11,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * DocentePanelController — endpoints del panel exclusivos para DOCENTES.
- *
- * Todas las rutas bajo /api/panel/docente/** requieren rol DOCENTE.
- * La validación ocurre en dos capas:
- *   1. SecurityConfig rechaza el request si no tiene rol DOCENTE.
- *   2. El controller verifica que el docenteId del token coincida
- *      con el recurso solicitado (un docente no puede ver los datos de otro).
- *
- * HU004 — Configuración de bloques de atención del docente.
  */
 @RestController
 @RequestMapping("/api/panel/docente")
@@ -29,17 +26,16 @@ import java.util.Map;
 public class DocentePanelController {
 
     private final DisponibilidadService disponibilidadService;
+    private final CitaRepository citaRepository;
 
-    public DocentePanelController(DisponibilidadService disponibilidadService) {
+    public DocentePanelController(DisponibilidadService disponibilidadService,
+                                   CitaRepository citaRepository) {
         this.disponibilidadService = disponibilidadService;
+        this.citaRepository = citaRepository;
     }
 
-    // ── HU004: Ver disponibilidad propia ──────────────────────────────────────
+    // ── HU004: Ver disponibilidad propia ────────────────────────────────────
 
-    /**
-     * GET /api/panel/docente/disponibilidad
-     * Devuelve los bloques del docente autenticado para los próximos 14 días.
-     */
     @GetMapping("/disponibilidad")
     public ResponseEntity<?> obtenerDisponibilidad(HttpServletRequest request) {
         Long docenteId = extraerDocenteId(request);
@@ -51,14 +47,8 @@ public class DocentePanelController {
         return ResponseEntity.ok(bloques);
     }
 
-    // ── HU004: Guardar disponibilidad ─────────────────────────────────────────
+    // ── HU004: Guardar disponibilidad ────────────────────────────────────────
 
-    /**
-     * POST /api/panel/docente/disponibilidad
-     * El docente configura sus bloques de atención para la semana.
-     *
-     * Body: { "bloques": [...], "reemplazarExistentes": true/false }
-     */
     @PostMapping("/disponibilidad")
     public ResponseEntity<?> guardarDisponibilidad(
             @Valid @RequestBody DisponibilidadRequest req,
@@ -80,15 +70,8 @@ public class DocentePanelController {
         }
     }
 
-    // ── HU004: Sugerencia de bloques con IA ──────────────────────────────────
+    // ── HU004: Sugerencia de bloques con IA ─────────────────────────────────
 
-    /**
-     * GET /api/panel/docente/disponibilidad/sugerir
-     * La IA analiza el historial del docente y propone los mejores bloques
-     * para la siguiente semana.
-     *
-     * Response: { "mensajeIA": "...", "bloquesSugeridos": [...] }
-     */
     @GetMapping("/disponibilidad/sugerir")
     public ResponseEntity<?> sugerirDisponibilidad(HttpServletRequest request) {
         Long docenteId = extraerDocenteId(request);
@@ -103,7 +86,55 @@ public class DocentePanelController {
         }
     }
 
-    // ── Helper: extraer docenteId del JWT (puesto por JwtAuthFilter) ──────────
+    // ── HU005: Citas pendientes / próximas del docente ───────────────────────
+
+    /**
+     * GET /api/panel/docente/citas-pendientes
+     * Devuelve las citas del docente autenticado que están pendientes o confirmadas,
+     * con fecha >= hoy, ordenadas por fecha+hora.
+     */
+    @GetMapping("/citas-pendientes")
+    public ResponseEntity<?> obtenerCitasPendientes(HttpServletRequest request) {
+        Long docenteId = extraerDocenteId(request);
+        if (docenteId == null) return errorSinVinculo();
+
+        LocalDate hoy = LocalDate.now();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd MMM", new java.util.Locale("es", "PE"));
+
+        List<Cita> citas = citaRepository.findByDocenteIdOrderByFechaAscHoraInicioAsc(docenteId);
+
+        List<Map<String, Object>> resultado = citas.stream()
+                .filter(c -> !c.getFecha().isBefore(hoy))
+                .filter(c -> "confirmada".equalsIgnoreCase(c.getEstado())
+                          || "pendiente".equalsIgnoreCase(c.getEstado()))
+                .map(c -> {
+                    Map<String, Object> m = new java.util.LinkedHashMap<>();
+                    m.put("id", c.getId());
+                    m.put("ticket", c.getTicket());
+                    m.put("estado", c.getEstado());
+                    m.put("motivo", c.getMotivo());
+                    m.put("fecha", c.getFecha().format(fmt));
+                    m.put("hora", c.getHoraInicio() != null
+                            ? c.getHoraInicio().toString().substring(0, 5) : "");
+                    // Datos del padre
+                    if (c.getPadre() != null) {
+                        m.put("padre", c.getPadre().getNombre() + " " + c.getPadre().getApellido());
+                    }
+                    // Datos del estudiante
+                    if (c.getEstudiante() != null) {
+                        m.put("alumno", c.getEstudiante().getNombre() + " " + c.getEstudiante().getApellido());
+                        m.put("grado", c.getEstudiante().getGrado() != null
+                                ? c.getEstudiante().getGrado() + " " + (c.getEstudiante().getSeccion() != null ? c.getEstudiante().getSeccion() : "")
+                                : "");
+                    }
+                    return m;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(resultado);
+    }
+
+    // ── Helper ──────────────────────────────────────────────────────────────
 
     private Long extraerDocenteId(HttpServletRequest request) {
         Object attr = request.getAttribute("docenteId");
