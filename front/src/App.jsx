@@ -30,8 +30,13 @@ function ChatPublico() {
         <EduBotChat />
       </main>
 
-      {/* ── Botón flotante de acceso al panel ── */}
+      {/* ── Botón flotante de acceso al panel (Ubicado a la izquierda y reordenado) ── */}
       <div className="panel-access-btn-wrapper">
+        {showLoginHint && (
+          <div className="panel-access-tooltip">
+            Acceso exclusivo para personal de la institución
+          </div>
+        )}
         <button
           className="panel-access-btn"
           onClick={() => window.location.href = '/panel'}
@@ -47,11 +52,6 @@ function ChatPublico() {
           </svg>
           <span>Panel Docente</span>
         </button>
-        {showLoginHint && (
-          <div className="panel-access-tooltip">
-            Acceso exclusivo para personal de la institución
-          </div>
-        )}
       </div>
     </div>
   );
