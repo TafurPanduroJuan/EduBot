@@ -111,6 +111,7 @@ function TarjetaPrediccionIA({ slots, docenteNombre, onSelect, onVerTodos }) {
         ))}
       </div>
       <button className="ia-ver-todos" onClick={onVerTodos}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         Ver todos los horarios disponibles
       </button>
     </div>
@@ -250,10 +251,19 @@ export default function EduBotChat() {
         text: '¡Hola! 👋 Soy EduBot, tu asistente virtual del colegio. Estoy aquí para ayudarte a gestionar citas con docentes.',
         card: (
           <div className="welcome-card">
-            <div className="wc-title">📅 Agendar Cita</div>
+            <div className="wc-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Agendar Cita
+            </div>
             <div className="wc-body">¿Necesitas hablar con un docente? Agenda tu cita de forma rápida y sencilla.</div>
-            <div className="wc-meta">🕐 Horario Lun–Vie · 8:00 AM–4:00 PM</div>
-            <div className="wc-meta">📆 Disponibilidad inmediata</div>
+            <div className="wc-meta">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Horario Lun–Vie · 8:00 AM–4:00 PM
+            </div>
+            <div className="wc-meta">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              Disponibilidad inmediata
+            </div>
             <button className="wc-btn" onClick={() => handleMenuSelect({ id: 'cita', label: 'Agendar cita' })}>
               Agendar Ahora ›
             </button>
@@ -476,25 +486,37 @@ export default function EduBotChat() {
     return map;
   }
 
+  // SVG icon components for chips
+  const IcoCalendario = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+  const IcoLista = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="18" r="1"/></svg>;
+  const IcoAyuda = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+  const IcoDocente = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+
   function renderControls() {
     if (paso === PASOS.INICIO || paso === PASOS.CONFIRMADO) {
       return (
-        <QuickReplies
-          options={[
-            { id: 'cita',     label: '📅 Agendar cita' },
-            { id: 'miscitas', label: '🗂️ Mis citas'   },
-            { id: 'ayuda',    label: '❓ Ayuda'        },
-          ]}
-          onSelect={handleMenuSelect}
-        />
+        <div className="quick-replies">
+          <button className="qr-btn" onClick={() => handleMenuSelect({ id: 'cita', label: 'Agendar cita' })}>
+            <IcoCalendario /> Agendar cita
+          </button>
+          <button className="qr-btn" onClick={() => handleMenuSelect({ id: 'miscitas', label: 'Mis citas' })}>
+            <IcoLista /> Mis citas
+          </button>
+          <button className="qr-btn" onClick={() => handleMenuSelect({ id: 'ayuda', label: 'Ayuda' })}>
+            <IcoAyuda /> Ayuda
+          </button>
+        </div>
       );
     }
     if (paso === PASOS.ELEGIR_DOCENTE) {
       return (
-        <QuickReplies
-          options={docentes.map(d => ({ id: d.id, label: d.nombre }))}
-          onSelect={handleDocenteSelect}
-        />
+        <div className="quick-replies">
+          {docentes.map(d => (
+            <button key={d.id} className="qr-btn" onClick={() => handleDocenteSelect({ id: d.id, label: d.nombre })}>
+              <IcoDocente /> {d.nombre}
+            </button>
+          ))}
+        </div>
       );
     }
     if (paso === PASOS.ELEGIR_MOTIVO) {
