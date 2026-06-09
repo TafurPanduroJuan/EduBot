@@ -252,28 +252,17 @@ function PanelApp() {
     );
   }
 
-  // ── Panel según rol ──
+  // ── Panel según rol — sin wrapper extra, cada panel trae su propio sidebar ──
   return (
-    <div className="app-shell">
-      <aside className="app-sidebar">
-        <div className="sidebar-header">
-          <div className="sidebar-logo"><span>E</span></div>
-          <div className="sidebar-info">
-            <h1>EduBot</h1>
-            <p>IE San Martín de Porres</p>
-          </div>
-        </div>
-      </aside>
-      <main className="app-main">
-        {user?.rol === 'ADMINISTRATIVO' ? (
-          <AdminDashboard user={user} onLogout={handleLogout} />
-        ) : user?.rol === 'DOCENTE' ? (
-          <DocentePanel user={user} onLogout={handleLogout} />
-        ) : (
-          <EduBotChat />
-        )}
-      </main>
-    </div>
+    <>
+      {user?.rol === 'ADMINISTRATIVO' ? (
+        <AdminDashboard user={user} onLogout={handleLogout} />
+      ) : user?.rol === 'DOCENTE' ? (
+        <DocentePanel user={user} onLogout={handleLogout} />
+      ) : (
+        <EduBotChat />
+      )}
+    </>
   );
 }
 

@@ -632,3 +632,30 @@
   .adm-kpi-grid       { grid-template-columns: 1fr 1fr; }
   .adm-export-filter-row { grid-template-columns: 1fr; }
 }
+
+/* ── FIX: Logout visible en mobile (sidebar colapsado) ── */
+@media (max-width: 900px) {
+  .adm-sidebar-brand,
+  .adm-nav-label      { display: none; }
+
+  /* Reemplaza el display:none del logout — muestra solo el ícono ↩ */
+  .adm-sidebar-logout {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    margin: 0 auto 8px !important;
+    font-size: 0 !important;
+    display: flex !important;
+  }
+  .adm-sidebar-logout::before {
+    content: '↩';
+    font-size: 18px;
+    color: rgba(255,255,255,0.9);
+  }
+}
+
+@media (max-width: 600px) {
+  .adm-sidebar { width: 48px !important; min-width: 48px !important; }
+}

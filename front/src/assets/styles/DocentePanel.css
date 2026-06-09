@@ -815,3 +815,31 @@
   .dp-inicio-cards { grid-template-columns: 1fr; }
   .dp-dispon-header { flex-direction: column; }
 }
+
+/* ── FIX: Logout visible en mobile (sidebar colapsado) ── */
+@media (max-width: 860px) {
+  .dp-sidebar-brand,
+  .dp-nav-label,
+  .dp-nav-badge       { display: none; }
+
+  /* Reemplaza el display:none del logout — muestra solo el ícono ↩ */
+  .dp-sidebar-logout {
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    margin: 0 auto 8px !important;
+    font-size: 0 !important;
+    display: flex !important;
+  }
+  .dp-sidebar-logout::before {
+    content: '↩';
+    font-size: 18px;
+    color: rgba(255,255,255,0.9);
+  }
+}
+
+@media (max-width: 500px) {
+  .dp-sidebar { width: 48px !important; min-width: 48px !important; }
+}
