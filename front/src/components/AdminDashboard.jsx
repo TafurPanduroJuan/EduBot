@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import "../assets/styles/AdminDashboard.css";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell,
 } from "recharts";
 import * as XLSX from "xlsx";
 
@@ -52,7 +52,7 @@ const DATA = {
     ],
     alertas: [
       { tipo: "warning", texto: "Martes 4pm tiene 3× más demanda — ¿habilitar más turnos?" },
-      { tipo: "error", texto: "Prof. Rosa Gómez: 0 citas esta semana — disponibilidad sin configurar." },
+      { tipo: "error", texto: "Prof. García: 0 citas esta semana — disponibilidad sin configurar." },
     ],
     citasRecientes: [
       { ticket: "EDU-7963", padre: "Rosa Mamani", docente: "Juan Pérez", motivo: "Rendimiento", fecha: "10 Mar 3:00 PM", estado: "Completada" },
@@ -89,9 +89,15 @@ const DATA = {
   },
 };
 
+const DOCENTES_DATA = [
+  { nombre: "Juan Pérez", curso: "Comunicación", grado: "3er A", citas: 18, disponibilidad: "Configurada" },
+  { nombre: "Ana Torres", curso: "Matemáticas", grado: "2do B", citas: 13, disponibilidad: "Configurada" },
+  { nombre: "Carlos Díaz", curso: "Ciencias", grado: "4to A", citas: 9, disponibilidad: "Configurada" },
+  { nombre: "Rosa Gómez", curso: "Historia", grado: "1er C", citas: 0, disponibilidad: "Sin configurar" },
+];
+
 const PIE_COLORS = ["#7B1F3A", "#c0536d", "#e8a0b0", "#f5d4db"];
 
-// ── Componente contador animado ──────────────────────────────────────────────
 function AnimatedNumber({ target, suffix = "" }) {
   const [value, setValue] = useState(0);
   useEffect(() => {
@@ -107,30 +113,52 @@ function AnimatedNumber({ target, suffix = "" }) {
   return <span>{value}{suffix}</span>;
 }
 
-export default function AdminDashboard() {
-  const dashboardRef = useRef();
+// Motivos horizontal bars como en el mockup HU008
+function MotivosBars({ motivos }) {
+  return (
+    <div className="adm-motivos-list">
+      <p className="adm-motivos-title">Motivos frecuentes</p>
+      {motivos.map((m) => (
+        <div key={m.name} className="adm-motivo-row">
+          <span className="adm-motivo-name">{m.name}</span>
+          <div className="adm-motivo-bar-wrap">
+            <div
+              className="adm-motivo-bar"
+              style={{ width: `${m.value}%` }}
+            />
+          </div>
+          <span className="adm-motivo-pct">{m.value}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function AdminDashboard({ user, onLogout }) {
+  const [activeNav, setActiveNav] = useState("dashboard");
   const [periodo, setPeriodo] = useState("mensual");
   const [alertasDismissed, setAlertasDismissed] = useState([]);
   const [resumenIA, setResumenIA] = useState(null);
   const [loadingIA, setLoadingIA] = useState(false);
   const [exportando, setExportando] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState("Todos");
+  const [exportPeriodo, setExportPeriodo] = useState("Feb – Mar 2026");
+  const [exportDocente, setExportDocente] = useState("Todos los docentes");
 
   const d = DATA[periodo];
 
-  const dismissAlerta = (i) => setAlertasDismissed(prev => [...prev, i]);
-
-  const alertasVisibles = d.alertas.filter((_, i) => !alertasDismissed.includes(`${periodo}-${i}`));
+  const alertasVisibles = d.alertas.filter(
+    (_, i) => !alertasDismissed.includes(`${periodo}-${i}`)
+  );
 
   const generarResumenIA = () => {
     setLoadingIA(true);
     setResumenIA(null);
     setTimeout(() => {
       setResumenIA(
-        `En el período ${periodo} se realizaron ${d.totalCitas} citas con ${d.asistencia}% de asistencia. ` +
+        `En ${exportPeriodo} se realizaron ${d.totalCitas} citas con ${d.asistencia}% de asistencia. ` +
         `El motivo principal fue ${d.motivos[0].name} (${d.motivos[0].value}%). ` +
-        `Se recomienda reforzar acompañamiento en 3er grado A y ampliar la disponibilidad del Prof. Juan Pérez ` +
-        `los martes de tarde, que concentran mayor demanda.`
+        `Se recomienda reforzar acompañamiento en 3er grado A.`
       );
       setLoadingIA(false);
     }, 1400);
@@ -150,8 +178,8 @@ export default function AdminDashboard() {
   const exportarCSV = () => {
     setExportando("csv");
     setTimeout(() => {
-      const filas = [["Docente", "Citas"], ...d.citas.map(r => [r.docente, r.citas])];
-      const csv = filas.map(f => f.join(",")).join("\n");
+      const filas = [["Docente", "Citas"], ...d.citas.map((r) => [r.docente, r.citas])];
+      const csv = filas.map((f) => f.join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -161,235 +189,441 @@ export default function AdminDashboard() {
     }, 600);
   };
 
-  const citasFiltradas = filtroEstado === "Todos"
-    ? d.citasRecientes
-    : d.citasRecientes.filter(c => c.estado === filtroEstado);
+  const citasFiltradas =
+    filtroEstado === "Todos"
+      ? d.citasRecientes
+      : d.citasRecientes.filter((c) => c.estado === filtroEstado);
 
-  // Resetear alertas dismissidas al cambiar período
-  useEffect(() => { setAlertasDismissed([]); setResumenIA(null); }, [periodo]);
+  useEffect(() => {
+    setAlertasDismissed([]);
+    setResumenIA(null);
+  }, [periodo]);
+
+  // ── NAV ITEMS ──
+  const navItems = [
+    { key: "dashboard", icon: "⊞", label: "Dashboard" },
+    { key: "docentes",  icon: "👤", label: "Docentes"  },
+    { key: "citas",     icon: "📅", label: "Citas"     },
+    { key: "reportes",  icon: "⬇", label: "Reportes"  },
+  ];
 
   return (
-    <div className="adm-wrap" ref={dashboardRef}>
-
-      {/* ── Header ── */}
-      <div className="adm-header">
-        <div>
-          <h1 className="adm-title">Dashboard Administrativo</h1>
-          <p className="adm-subtitle">IE San Martín de Porres · Actualizado ahora</p>
-        </div>
-        <div className="adm-header-right">
-          <div className="adm-periodo-tabs">
-            {["semanal","mensual","anual"].map(p => (
-              <button
-                key={p}
-                className={`adm-periodo-tab ${periodo === p ? "active" : ""}`}
-                onClick={() => setPeriodo(p)}
-              >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </button>
-            ))}
+    <div className="adm-shell">
+      {/* ── Sidebar ── */}
+      <aside className="adm-sidebar">
+        <div className="adm-sidebar-top">
+          <div className="adm-sidebar-avatar">A</div>
+          <div className="adm-sidebar-brand">
+            <span className="adm-sidebar-role">Panel Admin</span>
+            <span className="adm-sidebar-school">IE San Martín</span>
           </div>
         </div>
-      </div>
-
-      {/* ── KPI Cards ── */}
-      <div className="adm-kpi-grid">
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-icon kpi-purple">📅</div>
-          <div>
-            <p className="adm-kpi-label">Citas este período</p>
-            <p className="adm-kpi-value"><AnimatedNumber target={d.totalCitas} /></p>
-          </div>
-        </div>
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-icon kpi-green">✅</div>
-          <div>
-            <p className="adm-kpi-label">Tasa asistencia</p>
-            <p className="adm-kpi-value"><AnimatedNumber target={d.asistencia} suffix="%" /></p>
-          </div>
-        </div>
-        <div className="adm-kpi-card">
-          <div className="adm-kpi-icon kpi-gold">⭐</div>
-          <div>
-            <p className="adm-kpi-label">Satisfacción</p>
-            <p className="adm-kpi-value">{d.satisfaccion} <span className="adm-kpi-sub">/ 5.0</span></p>
-          </div>
-        </div>
-        <div className="adm-kpi-card kpi-highlight">
-          <div className="adm-kpi-icon kpi-red">👨‍🏫</div>
-          <div>
-            <p className="adm-kpi-label">Motivo frecuente</p>
-            <p className="adm-kpi-value adm-kpi-text">{d.motivos[0].name}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Alertas IA ── */}
-      {alertasVisibles.length > 0 && (
-        <div className="adm-alertas-section">
-          <div className="adm-alertas-header">
-            <span className="adm-ia-badge">✦ Alertas IA</span>
-            <span className="adm-alertas-fecha">
-              {periodo === "mensual" ? "Mar 2026" : periodo === "semanal" ? "Esta semana" : "2026"}
-            </span>
-          </div>
-          {alertasVisibles.map((a, i) => (
-            <div key={i} className={`adm-alerta adm-alerta-${a.tipo}`}>
-              <span>{a.tipo === "warning" ? "⚠️" : a.tipo === "error" ? "🔴" : "ℹ️"} {a.texto}</span>
-              <button className="adm-alerta-close" onClick={() => setAlertasDismissed(prev => [...prev, `${periodo}-${i}`])}>×</button>
-            </div>
+        <nav className="adm-sidebar-nav">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              className={`adm-nav-item ${activeNav === item.key ? "active" : ""}`}
+              onClick={() => setActiveNav(item.key)}
+            >
+              <span className="adm-nav-icon">{item.icon}</span>
+              <span className="adm-nav-label">{item.label}</span>
+            </button>
           ))}
-        </div>
-      )}
-
-      {/* ── Gráficos ── */}
-      <div className="adm-charts-grid">
-        <div className="adm-chart-card">
-          <h2 className="adm-section-title">Citas por Docente</h2>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={d.citas} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-              <XAxis dataKey="docente" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{ borderRadius: 8, fontSize: 13 }}
-                cursor={{ fill: "#f5e8ec" }}
-              />
-              <Bar dataKey="citas" fill="#7B1F3A" radius={[6,6,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="adm-chart-card">
-          <h2 className="adm-section-title">Motivos de Cita</h2>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie
-                data={d.motivos}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={90}
-                paddingAngle={3}
-                dataKey="value"
-                label={({ name, value }) => `${name} ${value}%`}
-                labelLine={false}
-              >
-                {d.motivos.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => `${v}%`} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* ── Citas Recientes ── */}
-      <div className="adm-table-card">
-        <div className="adm-table-header">
-          <h2 className="adm-section-title">Citas Recientes</h2>
-          <div className="adm-filtro-tabs">
-            {["Todos", "Pendiente", "Confirmada", "Completada"].map(f => (
-              <button
-                key={f}
-                className={`adm-filtro-tab ${filtroEstado === f ? "active" : ""}`}
-                onClick={() => setFiltroEstado(f)}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="adm-table-scroll">
-          <table className="adm-table">
-            <thead>
-              <tr>
-                <th>Ticket</th>
-                <th>Padre / Apoderado</th>
-                <th>Docente</th>
-                <th>Motivo</th>
-                <th>Fecha</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {citasFiltradas.length === 0 ? (
-                <tr><td colSpan={6} className="adm-empty">Sin citas para este filtro</td></tr>
-              ) : citasFiltradas.map((c, i) => (
-                <tr key={i}>
-                  <td><span className="adm-ticket">{c.ticket}</span></td>
-                  <td>{c.padre}</td>
-                  <td>{c.docente}</td>
-                  <td>{c.motivo}</td>
-                  <td className="adm-fecha">{c.fecha}</td>
-                  <td><span className={`adm-estado adm-estado-${c.estado.toLowerCase()}`}>{c.estado}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── Resumen IA ── */}
-      <div className="adm-ia-section">
-        <div className="adm-ia-header">
-          <span className="adm-ia-badge">✦ Resumen Ejecutivo IA</span>
-          <button className="adm-ia-btn" onClick={generarResumenIA} disabled={loadingIA}>
-            {loadingIA ? "Analizando..." : "✦ Generar Resumen"}
-          </button>
-        </div>
-        {loadingIA && (
-          <div className="adm-ia-loading">
-            <div className="adm-spinner" />
-            <span>EduBot IA está analizando los datos del período...</span>
-          </div>
-        )}
-        {resumenIA && !loadingIA && (
-          <div className="adm-ia-resultado">
-            <p>{resumenIA}</p>
-          </div>
-        )}
-        {!resumenIA && !loadingIA && (
-          <p className="adm-ia-placeholder">
-            Presiona "Generar Resumen" para obtener un análisis automático del período seleccionado.
-          </p>
-        )}
-      </div>
-
-      {/* ── Exportar UGEL ── */}
-      <div className="adm-export-card">
-        <div className="adm-export-header">
-          <div>
-            <h2 className="adm-section-title">Exportar Reporte UGEL</h2>
-            <p className="adm-export-desc">Genera el informe oficial para presentar a la UGEL</p>
-          </div>
-        </div>
-        <div className="adm-export-btns">
-          <button
-            className={`adm-export-btn adm-export-excel ${exportando === "excel" ? "loading" : ""}`}
-            onClick={exportarExcel}
-            disabled={!!exportando}
-          >
-            {exportando === "excel" ? "Generando..." : "📊 Excel"}
-          </button>
-          <button
-            className={`adm-export-btn adm-export-csv ${exportando === "csv" ? "loading" : ""}`}
-            onClick={exportarCSV}
-            disabled={!!exportando}
-          >
-            {exportando === "csv" ? "Generando..." : "📄 CSV"}
-          </button>
-        </div>
-        <button
-          className="adm-export-main-btn"
-          onClick={exportarExcel}
-          disabled={!!exportando}
-        >
-          ⬇ Generar y descargar reporte
+        </nav>
+        <button className="adm-sidebar-logout" onClick={onLogout}>
+          Cerrar sesión
         </button>
-      </div>
+      </aside>
 
+      {/* ── Main Content ── */}
+      <div className="adm-main">
+
+        {/* ════════════════ DASHBOARD ════════════════ */}
+        {activeNav === "dashboard" && (
+          <div className="adm-wrap">
+            {/* Header */}
+            <div className="adm-header">
+              <div>
+                <h1 className="adm-title">Dashboard Administrativo</h1>
+                <p className="adm-subtitle">
+                  Resumen —{" "}
+                  {periodo === "mensual"
+                    ? "Marzo 2026"
+                    : periodo === "semanal"
+                    ? "Esta semana"
+                    : "2026"}
+                  <span className="adm-subtitle-update"> · Actualizado: 10 Mar 2026 · 3:17 pm</span>
+                </p>
+              </div>
+              <div className="adm-periodo-tabs">
+                {["semanal", "mensual", "anual"].map((p) => (
+                  <button
+                    key={p}
+                    className={`adm-periodo-tab ${periodo === p ? "active" : ""}`}
+                    onClick={() => setPeriodo(p)}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* KPI Cards — exactamente como mockup: 3 métricas principales */}
+            <div className="adm-kpi-grid">
+              <div className="adm-kpi-card">
+                <p className="adm-kpi-value">
+                  <AnimatedNumber target={d.totalCitas} />
+                </p>
+                <p className="adm-kpi-label">Citas este mes</p>
+              </div>
+              <div className="adm-kpi-card">
+                <p className="adm-kpi-value">
+                  <AnimatedNumber target={d.asistencia} suffix="%" />
+                </p>
+                <p className="adm-kpi-label">Tasa asistencia</p>
+              </div>
+              <div className="adm-kpi-card">
+                <p className="adm-kpi-value">{d.satisfaccion}</p>
+                <p className="adm-kpi-label">Satisfacción</p>
+              </div>
+            </div>
+
+            {/* Alertas IA — como mockup */}
+            {alertasVisibles.length > 0 && (
+              <div className="adm-alertas-section">
+                <div className="adm-alertas-header">
+                  <span className="adm-ia-badge">✦ Alertas IA —{" "}
+                    {periodo === "mensual" ? "Marzo 2026" : periodo === "semanal" ? "Esta semana" : "2026"}
+                  </span>
+                </div>
+                {alertasVisibles.map((a, i) => (
+                  <div key={i} className={`adm-alerta adm-alerta-${a.tipo}`}>
+                    <span>
+                      {a.tipo === "warning" ? "·" : "·"} {a.texto}
+                    </span>
+                    <button
+                      className="adm-alerta-close"
+                      onClick={() =>
+                        setAlertasDismissed((prev) => [...prev, `${periodo}-${i}`])
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Motivos frecuentes (horizontal bars) + Gráfico de citas por docente */}
+            <div className="adm-charts-grid">
+              <div className="adm-chart-card">
+                <h2 className="adm-section-title">Citas por Docente</h2>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={d.citas} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                    <XAxis dataKey="docente" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                      cursor={{ fill: "#f5e8ec" }}
+                    />
+                    <Bar dataKey="citas" fill="#7B1F3A" radius={[5, 5, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="adm-chart-card">
+                <MotivosBars motivos={d.motivos} />
+              </div>
+            </div>
+
+            {/* Citas Recientes */}
+            <div className="adm-table-card">
+              <div className="adm-table-header">
+                <h2 className="adm-section-title">Citas Recientes</h2>
+                <div className="adm-filtro-tabs">
+                  {["Todos", "Pendiente", "Confirmada", "Completada"].map((f) => (
+                    <button
+                      key={f}
+                      className={`adm-filtro-tab ${filtroEstado === f ? "active" : ""}`}
+                      onClick={() => setFiltroEstado(f)}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="adm-table-scroll">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Ticket</th>
+                      <th>Padre / Apoderado</th>
+                      <th>Docente</th>
+                      <th>Motivo</th>
+                      <th>Fecha</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {citasFiltradas.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="adm-empty">
+                          Sin citas para este filtro
+                        </td>
+                      </tr>
+                    ) : (
+                      citasFiltradas.map((c, i) => (
+                        <tr key={i}>
+                          <td>
+                            <span className="adm-ticket">{c.ticket}</span>
+                          </td>
+                          <td>{c.padre}</td>
+                          <td>{c.docente}</td>
+                          <td>{c.motivo}</td>
+                          <td className="adm-fecha">{c.fecha}</td>
+                          <td>
+                            <span className={`adm-estado adm-estado-${c.estado.toLowerCase()}`}>
+                              {c.estado}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════ DOCENTES ════════════════ */}
+        {activeNav === "docentes" && (
+          <div className="adm-wrap">
+            <div className="adm-header">
+              <div>
+                <h1 className="adm-title">Docentes</h1>
+                <p className="adm-subtitle">Gestión de docentes de IE San Martín</p>
+              </div>
+            </div>
+            <div className="adm-table-card">
+              <div className="adm-table-header">
+                <h2 className="adm-section-title">Lista de Docentes</h2>
+              </div>
+              <div className="adm-table-scroll">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Docente</th>
+                      <th>Curso</th>
+                      <th>Grado</th>
+                      <th>Citas (mes)</th>
+                      <th>Disponibilidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DOCENTES_DATA.map((d, i) => (
+                      <tr key={i}>
+                        <td><strong>{d.nombre}</strong></td>
+                        <td>{d.curso}</td>
+                        <td>{d.grado}</td>
+                        <td>{d.citas}</td>
+                        <td>
+                          <span className={`adm-estado ${d.disponibilidad === "Configurada" ? "adm-estado-confirmada" : "adm-estado-pendiente"}`}>
+                            {d.disponibilidad}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════ CITAS ════════════════ */}
+        {activeNav === "citas" && (
+          <div className="adm-wrap">
+            <div className="adm-header">
+              <div>
+                <h1 className="adm-title">Citas</h1>
+                <p className="adm-subtitle">Historial completo de citas</p>
+              </div>
+              <div className="adm-periodo-tabs">
+                {["semanal", "mensual", "anual"].map((p) => (
+                  <button
+                    key={p}
+                    className={`adm-periodo-tab ${periodo === p ? "active" : ""}`}
+                    onClick={() => setPeriodo(p)}
+                  >
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="adm-table-card">
+              <div className="adm-table-header">
+                <h2 className="adm-section-title">Todas las Citas</h2>
+                <div className="adm-filtro-tabs">
+                  {["Todos", "Pendiente", "Confirmada", "Completada"].map((f) => (
+                    <button
+                      key={f}
+                      className={`adm-filtro-tab ${filtroEstado === f ? "active" : ""}`}
+                      onClick={() => setFiltroEstado(f)}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="adm-table-scroll">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Ticket</th>
+                      <th>Padre / Apoderado</th>
+                      <th>Docente</th>
+                      <th>Motivo</th>
+                      <th>Fecha</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {citasFiltradas.length === 0 ? (
+                      <tr><td colSpan={6} className="adm-empty">Sin citas para este filtro</td></tr>
+                    ) : citasFiltradas.map((c, i) => (
+                      <tr key={i}>
+                        <td><span className="adm-ticket">{c.ticket}</span></td>
+                        <td>{c.padre}</td>
+                        <td>{c.docente}</td>
+                        <td>{c.motivo}</td>
+                        <td className="adm-fecha">{c.fecha}</td>
+                        <td>
+                          <span className={`adm-estado adm-estado-${c.estado.toLowerCase()}`}>
+                            {c.estado}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════ REPORTES — HU009 mockup ════════════════ */}
+        {activeNav === "reportes" && (
+          <div className="adm-wrap">
+            <div className="adm-header">
+              <div>
+                <h1 className="adm-title">Exportar reporte UGEL</h1>
+                <p className="adm-subtitle">Genera el informe oficial para presentar a la UGEL</p>
+              </div>
+            </div>
+
+            {/* Filtros período y docente */}
+            <div className="adm-export-filters-card">
+              <div className="adm-export-filter-row">
+                <div className="adm-export-filter-group">
+                  <label className="adm-export-filter-label">Período</label>
+                  <input
+                    className="adm-export-filter-input"
+                    value={exportPeriodo}
+                    onChange={(e) => setExportPeriodo(e.target.value)}
+                  />
+                </div>
+                <div className="adm-export-filter-group">
+                  <label className="adm-export-filter-label">Docente</label>
+                  <select
+                    className="adm-export-filter-input"
+                    value={exportDocente}
+                    onChange={(e) => setExportDocente(e.target.value)}
+                  >
+                    <option>Todos los docentes</option>
+                    {DOCENTES_DATA.map((d) => (
+                      <option key={d.nombre}>{d.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Resumen IA — como en mockup HU009 */}
+              <div className="adm-ia-section" style={{ marginBottom: 0 }}>
+                <div className="adm-ia-header">
+                  <span className="adm-ia-badge">✦ Resumen ejecutivo generado por IA</span>
+                  <button
+                    className="adm-ia-btn"
+                    onClick={generarResumenIA}
+                    disabled={loadingIA}
+                  >
+                    {loadingIA ? "Analizando..." : "✦ Generar"}
+                  </button>
+                </div>
+                {loadingIA && (
+                  <div className="adm-ia-loading">
+                    <div className="adm-spinner" />
+                    <span>EduBot IA está analizando los datos...</span>
+                  </div>
+                )}
+                {resumenIA && !loadingIA && (
+                  <div className="adm-ia-resultado">
+                    <p>{resumenIA}</p>
+                  </div>
+                )}
+                {!resumenIA && !loadingIA && (
+                  <p className="adm-ia-placeholder">
+                    Presiona "Generar" para obtener el resumen ejecutivo del período seleccionado.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Formato de exportación — 3 botones como en mockup */}
+            <div className="adm-export-card">
+              <h2 className="adm-section-title" style={{ marginBottom: 16 }}>
+                Formato de exportación:
+              </h2>
+              <div className="adm-export-btns">
+                <button
+                  className={`adm-export-btn adm-export-excel ${exportando === "excel" ? "loading" : ""}`}
+                  onClick={exportarExcel}
+                  disabled={!!exportando}
+                >
+                  <span className="adm-export-btn-icon">⊞</span>
+                  {exportando === "excel" ? "Generando..." : "Excel"}
+                </button>
+                <button
+                  className={`adm-export-btn adm-export-pdf ${exportando === "pdf" ? "loading" : ""}`}
+                  onClick={() => {
+                    setExportando("pdf");
+                    setTimeout(() => setExportando(null), 600);
+                  }}
+                  disabled={!!exportando}
+                >
+                  <span className="adm-export-btn-icon">📄</span>
+                  {exportando === "pdf" ? "Generando..." : "PDF"}
+                </button>
+                <button
+                  className={`adm-export-btn adm-export-csv ${exportando === "csv" ? "loading" : ""}`}
+                  onClick={exportarCSV}
+                  disabled={!!exportando}
+                >
+                  <span className="adm-export-btn-icon">🗄</span>
+                  {exportando === "csv" ? "Generando..." : "CSV"}
+                </button>
+              </div>
+              <button
+                className="adm-export-main-btn"
+                onClick={exportarExcel}
+                disabled={!!exportando}
+              >
+                ⬇ Generar y descargar reporte
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
