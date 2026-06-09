@@ -49,4 +49,16 @@ public interface AIService {
      * @return Texto estructurado en formato institucional MINEDU
      */
     String estructurarActaMinedu(String notasLibres, Cita cita);
+
+    /**
+     * Analiza las citas del período y devuelve 2-3 alertas/insights
+     * en lenguaje natural para mostrar en el panel admin (HU008).
+     */
+    List<String> generarAlertasDashboard(List<Cita> citas, double tasaAsistencia, String periodo);
+
+    /**
+     * Genera un párrafo de resumen ejecutivo a partir de las citas del período,
+     * para adjuntar al reporte exportado (HU009).
+     */
+    String generarResumenEjecutivo(List<Cita> citas, String periodo);
 }

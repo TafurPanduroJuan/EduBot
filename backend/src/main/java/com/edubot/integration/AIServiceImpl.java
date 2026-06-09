@@ -326,4 +326,101 @@ public class AIServiceImpl implements AIService {
             "Hola %s, bienvenido a EduBot. Te ayudaremos a agendar tu cita por \"%s\".",
             nombrePadre, motivo);
     }
+
+    @Override
+    public List<String> generarAlertasDashboard(List<Cita> citas, double tasaAsistencia, String periodo) {
+        if (anthropicApiKey == null || anthropicApiKey.isBlank()) {
+            return buildAlertasFallback(citas, tasaAsistencia);
+        }
+        try {
+            long totalCitas = citas.size();
+            long completadas = citas.stream().filter(c -> "completada".equals(c.getEstado())).count();
+            Map<String, Long> motivoCount = citas.stream()
+                    .filter(c -> c.getMotivo() != null)
+                    .collect(java.util.stream.Collectors.groupingBy(
+                            Cita::getMotivo, java.util.stream.Collectors.counting()));
+            String motivoTop = motivoCount.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey).orElse("N/A");
+
+            String prompt = String.format("""
+                Eres el asistente de un panel administrativo escolar.
+                Datos del período %s:
+                - Total de citas: %d
+                - Citas completadas: %d
+                - Tasa de asistencia: %.1f%%
+                - Motivo más frecuente: %s
+                
+                Genera exactamente 2 o 3 alertas/insights breves y accionables en español
+                para el administrador. Cada alerta en una línea separada.
+                No uses bullets ni numeración. Solo el texto directo de cada alerta.
+                """, periodo, totalCitas, completadas, tasaAsistencia, motivoTop);
+
+            String respuesta = llamarAnthropicAPIConPrompt(prompt, 200);
+            return Arrays.asList(respuesta.split("\n")).stream()
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .limit(3)
+                    .collect(java.util.stream.Collectors.toList());
+        } catch (Exception e) {
+            log.warn("[AIService] Error generando alertas dashboard: {}", e.getMessage());
+            return buildAlertasFallback(citas, tasaAsistencia);
+        }
+    }
+
+    @Override
+    public String generarResumenEjecutivo(List<Cita> citas, String periodo) {
+        if (anthropicApiKey == null || anthropicApiKey.isBlank()) {
+            return buildResumenFallback(citas, periodo);
+        }
+        try {
+            long total = citas.size();
+            long completadas = citas.stream().filter(c -> "completada".equals(c.getEstado())).count();
+            long conAsistencia = citas.stream().filter(c -> Boolean.TRUE.equals(c.getAsistio())).count();
+            double tasa = completadas > 0 ? (conAsistencia * 100.0 / completadas) : 0;
+
+            String prompt = String.format("""
+                Eres el asistente de un sistema escolar. Genera un párrafo de resumen ejecutivo
+                para un reporte del período %s con estos datos:
+                - Total de citas: %d
+                - Completadas: %d
+                - Tasa de asistencia: %.1f%%
+                
+                El resumen debe ser formal, conciso (máximo 3 oraciones) y en español.
+                No uses viñetas. Solo el párrafo.
+                """, periodo, total, completadas, tasa);
+
+            return llamarAnthropicAPIConPrompt(prompt, 200);
+        } catch (Exception e) {
+            log.warn("[AIService] Error generando resumen ejecutivo: {}", e.getMessage());
+            return buildResumenFallback(citas, periodo);
+        }
+    }
+
+    private List<String> buildAlertasFallback(List<Cita> citas, double tasaAsistencia) {
+        List<String> alertas = new ArrayList<>();
+        if (tasaAsistencia < 70) {
+            alertas.add("La tasa de asistencia es " + String.format("%.1f", tasaAsistencia)
+                    + "% — se recomienda revisar los recordatorios automáticos.");
+        } else {
+            alertas.add("Tasa de asistencia del " + String.format("%.1f", tasaAsistencia)
+                    + "% — dentro del rango esperado.");
+        }
+        if (citas.size() > 20) {
+            alertas.add("Alta demanda este período (" + citas.size()
+                    + " citas) — considerar ampliar la disponibilidad de docentes.");
+        }
+        return alertas;
+    }
+
+    private String buildResumenFallback(List<Cita> citas, String periodo) {
+        long completadas = citas.stream().filter(c -> "completada".equals(c.getEstado())).count();
+        long conAsistencia = citas.stream().filter(c -> Boolean.TRUE.equals(c.getAsistio())).count();
+        double tasa = completadas > 0 ? (conAsistencia * 100.0 / completadas) : 0;
+        return String.format(
+            "Durante el período %s se registraron %d citas en total, de las cuales %d fueron completadas " +
+            "con una tasa de asistencia del %.1f%%. Se recomienda revisar los casos de inasistencia " +
+            "para implementar acciones de seguimiento oportuno.",
+            periodo, citas.size(), completadas, tasa);
+    }
 }
