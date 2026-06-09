@@ -1,0 +1,12 @@
+# Ignorar archivos compilados y temporales
+target/
+*.class
+*.log
+*.tmp
+*.bak
+*.swp
+
+# Ignorar configuraciones locales
+.idea/
+.vscode/
+.DS_Store

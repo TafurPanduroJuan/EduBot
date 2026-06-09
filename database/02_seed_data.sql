@@ -69,3 +69,14 @@ INSERT INTO citas (ticket, padre_id, docente_id, estudiante_id, fecha, hora_inic
 ('EDU-0022', 3, 1, 3, CURRENT_DATE - 20, '14:30', '15:00', 'matricula',   'completada', TRUE,  4)
 ON CONFLICT (ticket) DO NOTHING;
 
+INSERT INTO usuarios_panel (username, password, rol, docente_id, activo) VALUES
+-- Usuarios con rol ADMINISTRATIVO (docente_id queda en NULL)
+('admin.perez', '$2a$12$K3v7b8O9zXyWvUuTtSsRrEeDdCcBbAa1234567890abcdefghijk', 'ADMINISTRATIVO', NULL, TRUE),
+('soporte.gomez', '$2a$12$9XzYwVvUtTsSrRqQpPoOnNmMlLkKjJiIhHgGfFeEdDcCbBaA1', 'ADMINISTRATIVO', NULL, TRUE),
+('control.estudios', '$2a$12$L1mNoOpPqQrRsStTuUvVwWxXyYzZ0123456789abcdefghijk', 'ADMINISTRATIVO', NULL, FALSE), -- Usuario inactivo
+
+-- Usuarios con rol DOCENTE vinculados correctamente a tus IDs reales
+('garcia.torres', '$2a$12$mNlKjJiIhHgGfFeEdDcCbBaA9876543210abcdefghijklmno', 'DOCENTE', 1, TRUE), -- Vinculado a García Torres (Matemáticas)
+('lopez.rios', '$2a$12$aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789abcdefghijklm', 'DOCENTE', 2, TRUE),    -- Vinculado a López Ríos (Comunicación)
+('torres.medina', '$2a$12$PqRsTuVwXyZ0123456789abcdefghijklmnoPpQqRrSsTtUu', 'DOCENTE', 3, TRUE);   -- Vinculado a Torres Medina (Ciencias)
+
