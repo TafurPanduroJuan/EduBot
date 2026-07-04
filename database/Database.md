@@ -2,10 +2,10 @@ DATABASE (pgAdmin)
 General
   Name: EduBot Render
 Connection:
-  Hostname: dpg-d8abqasm0tmc739va8v0-a.oregon-postgres.render.com
+  Hostname: dpg-d8vkinb7uimc738idvn0-a.oregon-postgres.render.com
   Port: 5432
-  Maintenance Database: eudbot_db
+  Maintenance Database: edubot_db_io8w
   Username: edubot_user
-  Password: UAQ6Q9Velo9PXFWCzkQt3munYLumIEc3
+  Password: UsTVdwPVZxlWGST8uIt6KDMyRQpts9a4
 Parameters
   SSL mode: require
