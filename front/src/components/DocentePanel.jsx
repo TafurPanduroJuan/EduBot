@@ -59,22 +59,30 @@ const bloquesAGrilla = (bloques) => {
 const grillaABloques = (grilla) => {
   const hoy = new Date();
   const bloques = [];
+  // Próximo lunes (si hoy es lunes, será el siguiente lunes)
+  const diasHastaProximoLunes =
+    ((8 - hoy.getDay()) % 7) || 7;
   DIAS.forEach((diaLabel, idx) => {
-    // idx 0=Lun → dayOfWeek 1, etc.
-    const diasHastaLunes = (1 - hoy.getDay() + 7) % 7;
     const fecha = new Date(hoy);
-    fecha.setDate(hoy.getDate() + diasHastaLunes + idx);
+    fecha.setDate(
+      hoy.getDate() +
+      diasHastaProximoLunes +
+      idx
+    );
     const fechaStr = fecha.toISOString().split('T')[0];
-
     HORAS.forEach(horaLabel => {
       const estado = grilla[diaLabel][horaLabel];
       if (estado === 'disponible' || estado === 'ia-sugerido') {
         const inicio = HORA_A_TIME[horaLabel];
-        // hora fin = inicio + 30 min
         const [h, m] = inicio.split(':').map(Number);
         const finMin = m + 30;
-        const fin = `${String(h + Math.floor(finMin / 60)).padStart(2, '0')}:${String(finMin % 60).padStart(2, '0')}`;
-        bloques.push({ fecha: fechaStr, horaInicio: inicio, horaFin: fin });
+        const fin =
+          `${String(h + Math.floor(finMin / 60)).padStart(2,'0')}:${String(finMin % 60).padStart(2,'0')}`;
+        bloques.push({
+          fecha: fechaStr,
+          horaInicio: inicio,
+          horaFin: fin,
+        });
       }
     });
   });
