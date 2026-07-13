@@ -4,6 +4,7 @@ import {
   guardarDisponibilidad,
   sugerirDisponibilidadIA,
   obtenerCitasPendientesDocente,
+  actualizarEstadoCita,
   obtenerBriefingCita,
   generarActa,
 } from '../services/api';
@@ -222,14 +223,22 @@ export default function DocentePanel({ user, onLogout }) {
   };
 
   // ── Cambiar estado de cita (local mientras no hay endpoint PATCH docente) ─
-  const cambiarEstadoCita = (id, nuevoEstado) => {
-    setCitas(prev => prev.map(c => c.id === id ? { ...c, estado: nuevoEstado } : c));
-    if (citaActiva?.id === id) setCitaActiva(prev => ({ ...prev, estado: nuevoEstado }));
-    showToast(nuevoEstado === 'Confirmada'
-      ? '✅ Cita confirmada. El padre será notificado.'
-      : '❌ Cita rechazada.');
-    setBriefing(null);
-  };
+  const cambiarEstadoCita = async (id, nuevoEstado) => {
+    try{
+        await actualizarEstadoCita(id,nuevoEstado.toLowerCase());
+        await cargarCitas();
+        showToast(
+            nuevoEstado==="Confirmada"
+                ?"✅ Cita confirmada."
+                :"❌ Cita rechazada."
+        );
+    }catch(e){
+        showToast(
+            e.message,
+            "error"
+        );
+    }
+  }
 
   // ── Briefing IA ──────────────────────────────────────────────────────────
   const handleBriefing = async (cita) => {

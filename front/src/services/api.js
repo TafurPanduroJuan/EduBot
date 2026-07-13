@@ -150,3 +150,9 @@ export const exportarReporteBackend = async (formato, periodo = 'mensual') => {
   a.click();
   URL.revokeObjectURL(url);
 };
+
+export const actualizarEstadoCita = (id, estado) =>
+  request(`/panel/docente/citas/${id}/estado`, {
+    method: 'PATCH',
+    body: JSON.stringify({ estado }),
+  });

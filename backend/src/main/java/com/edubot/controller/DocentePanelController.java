@@ -147,4 +147,39 @@ public class DocentePanelController {
                 "error", "Tu usuario no está vinculado a ningún docente. " +
                          "Contacta al administrador."));
     }
+
+    @PatchMapping("/citas/{id}/estado")
+    public ResponseEntity<?> actualizarEstado(
+        @PathVariable Long id,
+        @RequestBody Map<String, String> body,
+        HttpServletRequest request) {
+
+        Long docenteId = extraerDocenteId(request);
+        if (docenteId == null) return errorSinVinculo();
+
+        Cita cita = citaRepository.findById(id).orElse(null);
+
+        if (cita == null)
+            return ResponseEntity.notFound().build();
+
+        // Seguridad:
+        // que el docente solo pueda modificar SUS citas
+        if (!cita.getDocente().getId().equals(docenteId)) {
+            return ResponseEntity.status(403).body(
+                    Map.of("error", "No puedes modificar esta cita."));
+        }
+
+        String estado = body.get("estado");
+
+        cita.setEstado(estado);
+
+        citaRepository.save(cita);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "mensaje","Estado actualizado",
+                        "estado",estado
+                )
+        );
+    }
 }
