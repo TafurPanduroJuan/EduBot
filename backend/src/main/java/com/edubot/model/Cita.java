@@ -40,7 +40,11 @@ public class Cita {
     // 'rendimiento', 'conducta', 'salud', 'otro'
     private String motivo;
 
-    // 'pendiente', 'confirmada', 'cancelada', 'completada'
+    // Estados posibles:
+    // confirmada -> cita agendada
+    // completada -> reunión realizada
+    // cancelada -> cancelada por padre o docente
+    // rechazada -> rechazada por docente
     private String estado = "confirmada";
 
     private Boolean asistio;

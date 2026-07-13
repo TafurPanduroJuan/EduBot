@@ -14,6 +14,10 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
 
     List<Cita> findByPadreIdOrderByFechaDesc(Long padreId);
 
+    List<Cita> findByEstado(String estado);
+
+    long countByEstado(String estado);
+
     List<Cita> findByFechaAndEstado(LocalDate fecha, String estado);
 
     /** Citas de un docente ordenadas por fecha y hora (para panel docente) */

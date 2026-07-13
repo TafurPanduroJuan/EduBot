@@ -48,7 +48,12 @@ public class ActaPdfService {
      * @return URL pública de descarga del PDF
      */
     public String generarPdf(Cita cita, String actaEstructurada) throws IOException {
-        // Asegurar que el directorio existe
+        if (!"completada".equalsIgnoreCase(cita.getEstado())) {
+            throw new IllegalStateException(
+                "Solo se puede generar un acta para una cita completada."
+            );
+        }
+        //Asegurar que el directorio existe
         Path dirPath = Paths.get(directorioActas);
         Files.createDirectories(dirPath);
 

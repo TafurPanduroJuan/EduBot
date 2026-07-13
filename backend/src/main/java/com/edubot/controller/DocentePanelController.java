@@ -182,4 +182,35 @@ public class DocentePanelController {
                 )
         );
     }
+    
+    @PatchMapping("/citas/{id}/completar")
+    public ResponseEntity<?> completarCita(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+
+        Long docenteId = extraerDocenteId(request);
+        if (docenteId == null) return errorSinVinculo();
+
+        Cita cita = citaRepository.findById(id).orElse(null);
+
+        if (cita == null)
+            return ResponseEntity.notFound().build();
+
+        if (!cita.getDocente().getId().equals(docenteId))
+            return ResponseEntity.status(403).build();
+
+        if (!"confirmada".equalsIgnoreCase(cita.getEstado())) {
+            return ResponseEntity.badRequest().body(
+                Map.of("error", "Solo una cita confirmada puede completarse.")
+            );
+        }
+
+        cita.setEstado("completada");
+
+        citaRepository.save(cita);
+
+        return ResponseEntity.ok(
+            Map.of("mensaje", "Cita marcada como completada.")
+        );
+    }
 }

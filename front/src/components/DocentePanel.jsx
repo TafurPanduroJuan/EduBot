@@ -266,11 +266,12 @@ export default function DocentePanel({ user, onLogout }) {
     try {
       const resp = await generarActa(modalActa.id, notasActa);
       setActaGenerada({
-        acuerdos:    resp?.acuerdos    || 'El estudiante reforzará los compromisos acordados.',
-        compromisos: resp?.compromisos || 'La familia acompañará el proceso académico.',
-        seguimiento: resp?.seguimiento || `Revisión en 30 días — ${new Date(Date.now() + 30 * 24 * 3600 * 1000).toLocaleDateString('es-PE', { day: 'numeric', month: 'short', year: 'numeric' })}.`,
+          acuerdos: resp.acta.acuerdos,
+          compromisos: resp.acta.compromisos,
+          seguimiento: resp.acta.seguimiento,
+          urlPdf: resp.urlPdf
       });
-      setCitas(prev => prev.map(c => c.id === modalActa.id ? { ...c, estado: 'Completada' } : c));
+      await cargarCitas();
       showToast(`✅ Acta del ticket ${modalActa.ticket} generada con IA.`);
     } catch {
       showToast('Error al generar el acta. Intenta de nuevo.', 'error');
@@ -672,7 +673,14 @@ export default function DocentePanel({ user, onLogout }) {
                 </div>
                 <div className="dp-modal-actions">
                   <button className="dp-btn-cancelar" onClick={() => setModalActa(null)}>Cerrar</button>
-                  <button className="dp-btn-ia">⬇ Descargar PDF</button>
+                  <a
+                      href={actaGenerada.urlPdf}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="dp-btn-ia"
+                  >
+                      ⬇ Descargar PDF
+                  </a>
                 </div>
               </div>
             )}
