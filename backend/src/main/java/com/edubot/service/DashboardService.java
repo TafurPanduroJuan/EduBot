@@ -47,6 +47,12 @@ public class DashboardService {
         List<Cita> completadas = todasLasCitas.stream()
                 .filter(c -> "completada".equals(c.getEstado()))
                 .collect(Collectors.toList());
+        
+        long pendientes = todasLasCitas.stream()
+                .filter(c -> "pendiente".equals(c.getEstado()))
+                .count();
+
+        long actasGeneradas = completadas.size();
 
         long conAsistencia = completadas.stream()
                 .filter(c -> Boolean.TRUE.equals(c.getAsistio()))
@@ -55,24 +61,25 @@ public class DashboardService {
         double tasaAsistencia = completadas.isEmpty() ? 0.0
                 : Math.round((conAsistencia * 100.0 / completadas.size()) * 10.0) / 10.0;
 
-        // ── Top docentes ──────────────────────────────────────────────────
-        List<Map<String, Object>> topDocentes = todasLasCitas.stream()
+        Map<Long, Long> totalPorDocente = todasLasCitas.stream()
                 .filter(c -> c.getDocente() != null)
                 .collect(Collectors.groupingBy(
                         c -> c.getDocente().getId(),
                         Collectors.counting()
-                ))
-                .entrySet().stream()
+                ));
+
+        // ── Top docentes ──────────────────────────────────────────────────
+        List<Map<String, Object>> topDocentes = totalPorDocente.entrySet().stream()
                 .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
                 .limit(5)
                 .map(e -> {
-                    Map<String, Object> entry = new LinkedHashMap<>();
+                    Map<String,Object> item = new LinkedHashMap<>();
                     docenteRepository.findById(e.getKey()).ifPresent(d ->
-                            entry.put("nombre", d.getNombre() + " " + d.getApellido()));
-                    entry.put("total", e.getValue());
-                    return entry;
+                        item.put("nombre", d.getNombre() + " " + d.getApellido()));
+                    item.put("total", e.getValue());
+                    return item;
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         // ── Motivos frecuentes ────────────────────────────────────────────
         List<Map<String, Object>> motivosFrecuentes = todasLasCitas.stream()
@@ -89,23 +96,17 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         // ── Citas por docente ─────────────────────────────────────────────
-        List<Map<String, Object>> citasPorDocente = todasLasCitas.stream()
-                .filter(c -> c.getDocente() != null)
-                .collect(Collectors.groupingBy(
-                        c -> c.getDocente().getId(),
-                        Collectors.counting()
-                ))
-                .entrySet().stream()
+        List<Map<String,Object>> citasPorDocente = totalPorDocente.entrySet().stream()
                 .map(e -> {
-                    Map<String, Object> entry = new LinkedHashMap<>();
-                    entry.put("docenteId", e.getKey());
+                    Map<String,Object> item = new LinkedHashMap<>();
+                    item.put("docenteId", e.getKey());
                     docenteRepository.findById(e.getKey()).ifPresent(d ->
-                            entry.put("nombre", d.getNombre() + " " + d.getApellido()));
-                    entry.put("total", e.getValue());
-                    return entry;
+                                item.put("nombre", d.getNombre() + " " + d.getApellido()));
+                    item.put("total", e.getValue());
+                    return item;
                 })
-                .sorted(Comparator.comparingLong(m -> -((Long) m.get("total"))))
-                .collect(Collectors.toList());
+                .sorted(Comparator.comparingLong(m -> -((Long)m.get("total"))))
+                .toList();
 
         // ── IA: generar alertas/insights ──────────────────────────────────
         List<String> alertasIA = generarAlertasIA(todasLasCitas, tasaAsistencia, periodo);
@@ -115,7 +116,10 @@ public class DashboardService {
         dto.setPeriodo(periodo);
         dto.setTotalCitas(todasLasCitas.size());
         dto.setCitasCompletadas(completadas.size());
+        dto.setCitasPendientes(pendientes);
+        dto.setActasGeneradas(actasGeneradas);
         dto.setTasaAsistencia(tasaAsistencia);
+        dto.setActasGeneradas(completadas.size());
         dto.setTopDocentes(topDocentes);
         dto.setMotivosFrecuentes(motivosFrecuentes);
         dto.setCitasPorDocente(citasPorDocente);

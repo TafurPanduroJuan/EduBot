@@ -20,6 +20,12 @@ public class DashboardResumenDTO {
     /** Citas completadas en el período */
     private long citasCompletadas;
 
+    /** Citas pendientes en el período */
+    private long citasPendientes;
+
+    /** Actas generadas en el período */
+    private long actasGeneradas;
+
     /** Tasa de asistencia: (asistio=true / completadas) * 100, redondeado */
     private double tasaAsistencia;
 

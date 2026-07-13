@@ -68,9 +68,7 @@ export default function AdminDashboard({ user, onLogout }) {
   // UI
   const [alertasDismissed, setAlertasDismissed] = useState([]);
   const [exportando, setExportando] = useState(null);
-  const [filtroEstado, setFiltroEstado] = useState("Todos");
   const [exportPeriodo, setExportPeriodo] = useState("mensual");
-  const [exportDocente, setExportDocente] = useState("Todos los docentes");
 
   // ── Carga del dashboard ──────────────────────────────────────────────────
   const cargarResumen = useCallback(async () => {
@@ -257,6 +255,18 @@ export default function AdminDashboard({ user, onLogout }) {
                     </p>
                     <p className="adm-kpi-label">Completadas</p>
                   </div>
+                  <div className="adm-kpi-card">
+                    <p className="adm-kpi-value">
+                      <AnimatedNumber target={resumen.citasPendientes} />
+                    </p>
+                    <p className="adm-kpi-label">Pendientes</p>
+                  </div>
+                  <div className="adm-kpi-card">
+                    <p className="adm-kpi-value">
+                        <AnimatedNumber target={resumen.actasGeneradas} />
+                    </p>
+                    <p className="adm-kpi-label">Actas generadas</p>
+                  </div>
                 </div>
 
                 {/* Alertas IA */}
@@ -427,19 +437,6 @@ export default function AdminDashboard({ user, onLogout }) {
                     <option value="semanal">Semanal</option>
                     <option value="mensual">Mensual</option>
                     <option value="anual">Anual</option>
-                  </select>
-                </div>
-                <div className="adm-export-filter-group">
-                  <label className="adm-export-filter-label">Docente</label>
-                  <select
-                    className="adm-export-filter-input"
-                    value={exportDocente}
-                    onChange={(e) => setExportDocente(e.target.value)}
-                  >
-                    <option>Todos los docentes</option>
-                    {docentes.map((d) => (
-                      <option key={d.nombre}>{d.nombre}</option>
-                    ))}
                   </select>
                 </div>
               </div>
