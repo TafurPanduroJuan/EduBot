@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/panel/auth/**").permitAll()
                 .requestMatchers("/api/edubot/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/actas/**").permitAll()
 
                 // ── Solo DOCENTE ────────────────────────────────────────
                 .requestMatchers(HttpMethod.GET,  "/api/panel/docente/**").hasRole("DOCENTE")

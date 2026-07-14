@@ -127,17 +127,18 @@ public class CitaContextoController {
         }
 
         try {
-            // 1. IA estructura el texto libre en formato MINEDU
-            String actaEstructurada = aiService.estructurarActaMinedu(notasLibres, cita);
-
-            // 2. Generar PDF con iText y obtener URL de descarga
-            String urlDescarga = actaPdfService.generarPdf(cita, actaEstructurada);
-
-            // 3. Marcar la cita como completada si aún estaba confirmada
-            if ("confirmada".equals(cita.getEstado())) {
+            // 1. Marcar la cita como completada antes de generar el acta
+            //    (ActaPdfService exige que la cita ya esté "completada")
+            if (!"completada".equalsIgnoreCase(cita.getEstado())) {
                 cita.setEstado("completada");
                 citaRepository.save(cita);
             }
+
+            // 2. IA estructura el texto libre en formato MINEDU
+            String actaEstructurada = aiService.estructurarActaMinedu(notasLibres, cita);
+
+            // 3. Generar PDF con iText y obtener URL de descarga
+            String urlDescarga = actaPdfService.generarPdf(cita, actaEstructurada);
 
             Map<String, Object> resp = new LinkedHashMap<>();
             resp.put("ticket",           cita.getTicket());

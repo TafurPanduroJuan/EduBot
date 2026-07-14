@@ -104,9 +104,15 @@ public class DocentePanelController {
         List<Cita> citas = citaRepository.findByDocenteIdOrderByFechaAscHoraInicioAsc(docenteId);
 
         List<Map<String, Object>> resultado = citas.stream()
-                .filter(c -> !c.getFecha().isBefore(hoy))
-                .filter(c -> "confirmada".equalsIgnoreCase(c.getEstado())
-                          || "pendiente".equalsIgnoreCase(c.getEstado()))
+                .filter(c ->
+                        // Las citas completadas se muestran siempre (para poder
+                        // ver/redactar su acta), sin importar la fecha.
+                        "completada".equalsIgnoreCase(c.getEstado())
+                        // Las pendientes/confirmadas solo se muestran si son de
+                        // hoy en adelante (comportamiento original).
+                        || (!c.getFecha().isBefore(hoy)
+                            && ("confirmada".equalsIgnoreCase(c.getEstado())
+                                || "pendiente".equalsIgnoreCase(c.getEstado()))))
                 .map(c -> {
                     Map<String, Object> m = new java.util.LinkedHashMap<>();
                     m.put("id", c.getId());
