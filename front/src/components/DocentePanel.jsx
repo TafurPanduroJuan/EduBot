@@ -90,6 +90,32 @@ const grillaABloques = (grilla) => {
   return bloques;
 };
 
+// Convierte el texto plano que devuelve la IA (ACUERDOS: / COMPROMISOS: / SEGUIMIENTO:)
+// en un objeto { acuerdos, compromisos, seguimiento }
+function parseActaEstructurada(texto) {
+  const secciones = ['ACUERDOS:', 'COMPROMISOS:', 'SEGUIMIENTO:'];
+  const claves = ['acuerdos', 'compromisos', 'seguimiento'];
+  const resultado = { acuerdos: '', compromisos: '', seguimiento: '' };
+
+  if (!texto) return resultado;
+
+  secciones.forEach((marcador, i) => {
+    const inicio = texto.indexOf(marcador);
+    if (inicio === -1) return;
+
+    let fin = texto.length;
+    secciones.forEach((otro, j) => {
+      if (j === i) return;
+      const idxOtro = texto.indexOf(otro, inicio + marcador.length);
+      if (idxOtro > -1 && idxOtro < fin) fin = idxOtro;
+    });
+
+    resultado[claves[i]] = texto.substring(inicio + marcador.length, fin).trim();
+  });
+
+  return resultado;
+}
+
 export default function DocentePanel({ user, onLogout }) {
   const [activeNav, setActiveNav]             = useState('disponibilidad');
   const [grilla, setGrilla]                   = useState(iniciarGrilla);
@@ -265,15 +291,17 @@ export default function DocentePanel({ user, onLogout }) {
     setLoadingActa(true);
     try {
       const resp = await generarActa(modalActa.id, notasActa);
+      const partes = parseActaEstructurada(resp.actaEstructurada);
       setActaGenerada({
-          acuerdos: resp.acta.acuerdos,
-          compromisos: resp.acta.compromisos,
-          seguimiento: resp.acta.seguimiento,
-          urlPdf: resp.urlPdf
+          acuerdos: partes.acuerdos,
+          compromisos: partes.compromisos,
+          seguimiento: partes.seguimiento,
+          urlPdf: resp.urlDescarga
       });
       await cargarCitas();
       showToast(`✅ Acta del ticket ${modalActa.ticket} generada con IA.`);
-    } catch {
+    } catch (err) {
+      console.error('[Acta] Error:', err);
       showToast('Error al generar el acta. Intenta de nuevo.', 'error');
     } finally {
       setLoadingActa(false);
