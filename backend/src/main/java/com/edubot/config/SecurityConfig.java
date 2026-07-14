@@ -67,6 +67,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,  "/api/panel/docente/**").hasRole("DOCENTE")
                 .requestMatchers(HttpMethod.POST, "/api/panel/docente/**").hasRole("DOCENTE")
                 .requestMatchers(HttpMethod.PUT,  "/api/panel/docente/**").hasRole("DOCENTE")
+                .requestMatchers(HttpMethod.PATCH,"/api/panel/docente/**").hasRole("DOCENTE")
                 .requestMatchers(HttpMethod.DELETE,"/api/panel/docente/**").hasRole("DOCENTE")
 
                 // ── Solo ADMINISTRATIVO ─────────────────────────────────
