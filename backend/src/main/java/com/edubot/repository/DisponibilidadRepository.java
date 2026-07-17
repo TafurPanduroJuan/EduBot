@@ -29,6 +29,13 @@ public interface DisponibilidadRepository extends JpaRepository<DisponibilidadDo
     List<DisponibilidadDocente> findByDocenteIdAndFechaGreaterThanEqual(
             Long docenteId, LocalDate desde);
 
-    /** Elimina todos los bloques futuros de un docente (para reconfiguración total) */
-    void deleteByDocenteIdAndFechaGreaterThanEqual(Long docenteId, LocalDate desde);
+    /**
+     * Elimina los bloques futuros de un docente que SIGUEN LIBRES (para
+     * reconfiguración total de disponibilidad). Los bloques ya ocupados
+     * por una cita confirmada (disponible=false) se preservan, para no
+     * perder el registro de citas ya agendadas cuando el docente vuelve
+     * a guardar su disponibilidad.
+     */
+    void deleteByDocenteIdAndFechaGreaterThanEqualAndDisponibleTrue(
+            Long docenteId, LocalDate desde);
 }

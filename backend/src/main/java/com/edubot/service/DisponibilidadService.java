@@ -14,9 +14,11 @@
         import org.springframework.transaction.annotation.Transactional;
         import org.springframework.web.client.RestTemplate;
 
+        import java.time.DayOfWeek;
         import java.time.LocalDate;
         import java.time.LocalTime;
         import java.util.*;
+        import java.util.stream.Collectors;
 
         /**
          * DisponibilidadService — gestiona los bloques de atención del docente (HU004).
@@ -76,7 +78,10 @@
                         .orElseThrow(() -> new RuntimeException("Docente no encontrado: " + docenteId));
 
                 if (req.isReemplazarExistentes()) {
-                    dispRepo.deleteByDocenteIdAndFechaGreaterThanEqual(docenteId, LocalDate.now());
+                    // Solo se borran los bloques que siguen LIBRES; los que ya
+                    // tienen una cita confirmada (disponible=false) se preservan.
+                    dispRepo.deleteByDocenteIdAndFechaGreaterThanEqualAndDisponibleTrue(
+                            docenteId, LocalDate.now());
                 }
 
                 List<DisponibilidadDocente> creados = new ArrayList<>();
@@ -120,15 +125,15 @@
                 if (anthropicApiKey == null || anthropicApiKey.isBlank()) {
                     log.warn("[IA] API key no configurada — usando sugerencia local");
                     mensajeIA      = sugerenciaLocal(docente.getNombre());
-                    bloquesSugeridos = bloquesPorDefecto();
+                    bloquesSugeridos = bloquesPorDefecto(historial, docenteId);
                 } else {
                     try {
                         mensajeIA      = llamarAnthropicSugerencia(docente.getNombre(), resumenHistorial);
-                        bloquesSugeridos = bloquesPorDefecto(); // La IA da el texto; los bloques son los comunes
+                        bloquesSugeridos = bloquesPorDefecto(historial, docenteId);
                     } catch (Exception e) {
                         log.error("[IA] Error llamando Anthropic: {}", e.getMessage());
                         mensajeIA      = sugerenciaLocal(docente.getNombre());
-                        bloquesSugeridos = bloquesPorDefecto();
+                        bloquesSugeridos = bloquesPorDefecto(historial, docenteId);
                     }
                 }
 
@@ -202,19 +207,79 @@
                     "tasa de asistencia entre padres trabajadores.", nombreDocente);
             }
 
-            /** Bloques típicos recomendados para la próxima semana */
-            private List<Map<String, String>> bloquesPorDefecto() {
-                List<Map<String, String>> bloques = new ArrayList<>();
-                LocalDate lunes = LocalDate.now().plusDays(
-                        (8 - LocalDate.now().getDayOfWeek().getValue()) % 7 + 1);
+            /**
+             * Bloques recomendados para la próxima semana.
+             *
+             * A diferencia de la versión anterior (que devolvía siempre
+             * martes/miércoles/jueves a las mismas horas fijas para
+             * cualquier docente), esta versión:
+             *  1) Prioriza las horas más usadas por ESE docente en su
+             *     historial reciente (si existe).
+             *  2) Si no hay historial, elige horas variadas de un pool
+             *     típico de tarde, con orden aleatorio.
+             *  3) Elige 3 días hábiles distintos al azar dentro de los
+             *     próximos 10 días hábiles, evitando bloques que el
+             *     docente ya tenga registrados, para que cada llamada
+             *     a "Sugerir con IA" no repita siempre el mismo patrón.
+             */
+            private List<Map<String, String>> bloquesPorDefecto(
+                    List<DisponibilidadDocente> historial, Long docenteId) {
 
-                // Martes 3pm-5pm
-                bloques.add(bloque(lunes.plusDays(1), "15:00", "17:00"));
-                // Miércoles 4pm-6pm
-                bloques.add(bloque(lunes.plusDays(2), "16:00", "18:00"));
-                // Jueves 3pm-5pm
-                bloques.add(bloque(lunes.plusDays(3), "15:00", "17:00"));
+                List<LocalTime> horasCandidatas = obtenerHorasSugeridas(historial);
+
+                Set<LocalDate> fechasYaRegistradas = dispRepo
+                        .findByDocenteIdAndFechaGreaterThanEqual(docenteId, LocalDate.now())
+                        .stream()
+                        .map(DisponibilidadDocente::getFecha)
+                        .collect(Collectors.toSet());
+
+                List<LocalDate> diasHabilesDisponibles = new ArrayList<>();
+                LocalDate cursor = LocalDate.now().plusDays(1);
+                while (diasHabilesDisponibles.size() < 8
+                        && cursor.isBefore(LocalDate.now().plusDays(20))) {
+                    DayOfWeek dow = cursor.getDayOfWeek();
+                    boolean esHabil = dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
+                    if (esHabil && !fechasYaRegistradas.contains(cursor)) {
+                        diasHabilesDisponibles.add(cursor);
+                    }
+                    cursor = cursor.plusDays(1);
+                }
+
+                Collections.shuffle(diasHabilesDisponibles);
+                List<LocalDate> diasElegidos = diasHabilesDisponibles
+                        .subList(0, Math.min(3, diasHabilesDisponibles.size()));
+                diasElegidos.sort(Comparator.naturalOrder());
+
+                List<Map<String, String>> bloques = new ArrayList<>();
+                for (int i = 0; i < diasElegidos.size(); i++) {
+                    LocalTime inicio = horasCandidatas.get(i % horasCandidatas.size());
+                    LocalTime fin = inicio.plusHours(2);
+                    bloques.add(bloque(diasElegidos.get(i), inicio.toString(), fin.toString()));
+                }
                 return bloques;
+            }
+
+            /** Devuelve las horas más usadas por el docente, o un pool variado si no hay historial. */
+            private List<LocalTime> obtenerHorasSugeridas(List<DisponibilidadDocente> historial) {
+                if (historial != null && !historial.isEmpty()) {
+                    List<LocalTime> masUsadas = historial.stream()
+                            .collect(Collectors.groupingBy(
+                                    DisponibilidadDocente::getHoraInicio, Collectors.counting()))
+                            .entrySet().stream()
+                            .sorted(Map.Entry.<LocalTime, Long>comparingByValue().reversed())
+                            .map(Map.Entry::getKey)
+                            .limit(3)
+                            .collect(Collectors.toList());
+                    if (!masUsadas.isEmpty()) return masUsadas;
+                }
+
+                // Sin historial: pool de horas típicas de tarde (preferidas por padres
+                // trabajadores), mezclado al azar para no repetir siempre el mismo patrón.
+                List<LocalTime> pool = new ArrayList<>(List.of(
+                        LocalTime.of(15, 0), LocalTime.of(16, 0), LocalTime.of(17, 0),
+                        LocalTime.of(10, 0), LocalTime.of(14, 0)));
+                Collections.shuffle(pool);
+                return pool.subList(0, 3);
             }
 
             private Map<String, String> bloque(LocalDate fecha, String inicio, String fin) {
