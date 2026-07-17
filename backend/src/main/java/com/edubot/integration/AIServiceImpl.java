@@ -16,6 +16,7 @@ import org.springframework.web.client.RestTemplate;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 public class AIServiceImpl implements AIService {
@@ -91,7 +92,10 @@ public class AIServiceImpl implements AIService {
         score += scoreCompatibilidadHoraria(padre.getHorarioLaboral(), franja.getHoraInicio());
         score += scoreHistorialExitoso(franja.getHoraInicio(), citasExitosas);
         score += scorePopularidad(franja.getHoraInicio());
-        score += (franja.getId().intValue() % 5);
+        // Pequeño componente aleatorio (0-4 pts) para desempatar franjas con
+        // señales idénticas, evitando que la sugerencia sea 100% predecible
+        // cuando varias franjas comparten la misma hora en distintos días.
+        score += ThreadLocalRandom.current().nextInt(5);
         return Math.min(score, 99);
     }
 
