@@ -54,6 +54,36 @@ public class AuthController {
     }
 
     /**
+     * Restaura la sesión a partir del JWT ya emitido.
+     * La usa el frontend al recargar la página (F5), para no forzar
+     * un nuevo login mientras el token siga vigente.
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> me(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).body(Map.of("error", "No autenticado"));
+        }
+
+        String username = authentication.getName();
+        UsuarioPanel usuario = usuarioRepo.findByUsername(username).orElse(null);
+        if (usuario == null || !usuario.isActivo()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Usuario no encontrado o inactivo"));
+        }
+
+        Long docenteId = usuario.getDocente() != null ? usuario.getDocente().getId() : null;
+        String nombreDocente = usuario.getDocente() != null
+                ? usuario.getDocente().getNombre() + " " + usuario.getDocente().getApellido()
+                : null;
+
+        Map<String, Object> resp = new java.util.LinkedHashMap<>();
+        resp.put("username", usuario.getUsername());
+        resp.put("rol", usuario.getRol().name());
+        resp.put("docenteId", docenteId);
+        resp.put("nombreDocente", nombreDocente);
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
      * Crea un usuario DOCENTE vinculado a un docente existente.
      * Solo accesible para ADMINISTRATIVO.
      *

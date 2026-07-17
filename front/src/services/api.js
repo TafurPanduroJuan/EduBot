@@ -81,6 +81,21 @@ export const loginPanel = async (credentials) => {
   return resp;
 };
 
+/**
+ * Restaura la sesión a partir del token guardado (usado al recargar
+ * la página). Devuelve null si no hay token o si ya no es válido.
+ */
+export const obtenerSesionActual = async () => {
+  if (!getToken()) return null;
+  try {
+    return await request('/panel/auth/me');
+  } catch {
+    // Token vencido/inválido — lo limpiamos para no quedar en loop.
+    removeToken();
+    return null;
+  }
+};
+
 /* ===================================================
    PANEL DOCENTE
 =================================================== */

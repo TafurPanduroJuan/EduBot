@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import EduBotChat from './components/EduBotChat.jsx';
 import DocentePanel from './components/DocentePanel.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
-import { loginPanel, removeToken } from './services/api';
+import { loginPanel, removeToken, obtenerSesionActual } from './services/api';
 import './App.css';
 
 // ── Enrutador manual (sin react-router-dom) ───────────────────────────────────
@@ -64,6 +64,20 @@ function PanelApp() {
   const [error, setError]           = useState('');
   const [loading, setLoading]       = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [restaurandoSesion, setRestaurandoSesion] = useState(true);
+
+  // Al montar: si hay un token guardado, intenta restaurar la sesión
+  // sin pedir credenciales de nuevo (arregla el "F5 me manda al login").
+  useEffect(() => {
+    (async () => {
+      const sesion = await obtenerSesionActual();
+      if (sesion) {
+        setUser(sesion);
+        setIsLoggedIn(true);
+      }
+      setRestaurandoSesion(false);
+    })();
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -90,6 +104,18 @@ function PanelApp() {
     setIsLoggedIn(false);
     setUser(null);
   };
+
+  // Mientras se valida el token guardado, no mostramos el login todavía
+  // (evita el parpadeo de "login → panel" en cada F5).
+  if (restaurandoSesion) {
+    return (
+      <div className="login-screen">
+        <div style={{ margin: 'auto', color: '#7B1F3A', fontWeight: 600 }}>
+          Cargando sesión…
+        </div>
+      </div>
+    );
+  }
 
   // ── Login ──
   if (!isLoggedIn) {
