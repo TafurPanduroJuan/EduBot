@@ -58,6 +58,19 @@ function MotivosBars({ motivos }) {
   );
 }
 
+// ── Helpers de validación de formularios ─────────────────────────────────────
+// Solo letras (con tildes/ñ) y espacios — usado en Nombre / Apellido para que
+// no se puedan escribir números ni caracteres especiales.
+const soloLetras = (valor) => valor.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]/g, "");
+// Solo dígitos, con un largo máximo — usado en DNI / Teléfono.
+const soloDigitos = (valor, maxLen) => valor.replace(/\D/g, "").slice(0, maxLen);
+
+// El valor guardado en BD es el value crudo del <select> ("manana", "tarde",
+// "noche"); esto solo lo traduce a la etiqueta legible para mostrarlo en la
+// tabla (antes se imprimía tal cual, sin la tilde: "manana").
+const HORARIO_LABELS = { manana: "Mañana", tarde: "Tarde", noche: "Noche" };
+const horarioLabel = (valor) => (valor ? (HORARIO_LABELS[valor] || valor) : "—");
+
 // ── Modal genérico ───────────────────────────────────────────────────────────
 function ModalCard({ title, subtitle, onClose, children }) {
   return (
@@ -185,17 +198,32 @@ function NuevoPadreModal({ onClose, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    let valor = e.target.value;
+    if (field === "nombre" || field === "apellido") valor = soloLetras(valor);
+    else if (field === "dni") valor = soloDigitos(valor, 8);
+    else if (field === "telefono") valor = soloDigitos(valor, 9);
+    setForm((f) => ({ ...f, [field]: valor }));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
     if (!/^\d{8}$/.test(form.dni)) {
-      setError("El DNI debe tener exactamente 8 dígitos.");
+      setError("El DNI debe tener exactamente 8 dígitos numéricos.");
       return;
     }
     if (!form.nombre.trim() || !form.apellido.trim()) {
       setError("Nombre y apellido son obligatorios.");
+      return;
+    }
+    if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/.test(form.nombre.trim()) ||
+        !/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/.test(form.apellido.trim())) {
+      setError("Nombre y apellido solo pueden contener letras.");
+      return;
+    }
+    if (form.telefono.trim() && !/^\d{9}$/.test(form.telefono.trim())) {
+      setError("El teléfono debe tener exactamente 9 dígitos numéricos.");
       return;
     }
     setSaving(true);
@@ -239,15 +267,22 @@ function NuevoPadreModal({ onClose, onCreated }) {
         <div className="adm-form-grid">
           <div className="adm-form-field">
             <label className="adm-form-label">Nombre <span className="req">*</span></label>
-            <input className="adm-form-input" value={form.nombre} onChange={set("nombre")} placeholder="Rosa" />
+            <input className="adm-form-input" value={form.nombre} onChange={set("nombre")} placeholder="Rosa" maxLength={60} />
           </div>
           <div className="adm-form-field">
             <label className="adm-form-label">Apellido <span className="req">*</span></label>
-            <input className="adm-form-input" value={form.apellido} onChange={set("apellido")} placeholder="Mamani" />
+            <input className="adm-form-input" value={form.apellido} onChange={set("apellido")} placeholder="Mamani" maxLength={60} />
           </div>
           <div className="adm-form-field">
             <label className="adm-form-label">Teléfono</label>
-            <input className="adm-form-input" value={form.telefono} onChange={set("telefono")} placeholder="987654321" />
+            <input
+              className="adm-form-input"
+              value={form.telefono}
+              onChange={set("telefono")}
+              placeholder="987654321"
+              maxLength={9}
+              inputMode="numeric"
+            />
           </div>
           <div className="adm-form-field">
             <label className="adm-form-label">Horario laboral</label>
@@ -277,13 +312,22 @@ function NuevoHijoModal({ padre, onClose, onCreated }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const set = (field) => (e) => {
+    let valor = e.target.value;
+    if (field === "nombre" || field === "apellido") valor = soloLetras(valor);
+    setForm((f) => ({ ...f, [field]: valor }));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
     if (!form.nombre.trim() || !form.apellido.trim()) {
       setError("Nombre y apellido son obligatorios.");
+      return;
+    }
+    if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/.test(form.nombre.trim()) ||
+        !/^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\s]+$/.test(form.apellido.trim())) {
+      setError("Nombre y apellido solo pueden contener letras.");
       return;
     }
     setSaving(true);
@@ -1013,7 +1057,7 @@ export default function AdminDashboard({ user, onLogout }) {
                           <td>{p.dni}</td>
                           <td><strong>{p.nombre} {p.apellido}</strong></td>
                           <td>{p.telefono || "—"}</td>
-                          <td>{p.horarioLaboral || "—"}</td>
+                          <td>{horarioLabel(p.horarioLaboral)}</td>
                           <td>
                             <div className="adm-hijos-cell">
                               {(p.estudiantes || []).length === 0 && (

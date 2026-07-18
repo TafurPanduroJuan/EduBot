@@ -156,6 +156,7 @@ function TarjetaConfirmacion({ cita }) {
         <div className="confirm-row"><span>Ticket</span><span style={{color:'var(--brand)',fontWeight:700}}>{cita.ticket || codigo}</span></div>
         <div className="confirm-row"><span>Docente</span><span>{cita.docente}</span></div>
         <div className="confirm-row"><span>Curso</span><span>{cita.curso}</span></div>
+        {cita.estudiante && <div className="confirm-row"><span>Estudiante</span><span>{cita.estudiante}</span></div>}
         <div className="confirm-row"><span>Motivo</span><span>{cita.motivo}</span></div>
         <div className="confirm-row"><span>Fecha</span><span>{formatFecha(cita.fecha)}</span></div>
         <div className="confirm-row"><span>Hora</span><span>{cita.horaInicio} – {cita.horaFin}</span></div>
@@ -204,6 +205,7 @@ function Burbuja({ msg }) {
 const PASOS = {
   INICIO: 'inicio',
   IDENTIFICAR: 'identificar',
+  ELEGIR_HIJO: 'elegir_hijo',
   ELEGIR_DOCENTE: 'elegir_docente',
   ELEGIR_MOTIVO: 'elegir_motivo',
   IA_SUGERENCIA: 'ia_sugerencia',
@@ -219,6 +221,7 @@ export default function EduBotChat() {
   const [padre, setPadre] = useState(null);
   const [docentes, setDocentes] = useState([]);
   const [docenteElegido, setDocenteElegido] = useState(null);
+  const [hijoElegido, setHijoElegido] = useState(null);
   const [motivo, setMotivo] = useState(null);
   const [horariosData, setHorariosData] = useState(null); // { sugerenciasIA, todosLosHorarios }
   const [fechaSelCalendario, setFechaSelCalendario] = useState(null);
@@ -409,6 +412,8 @@ export default function EduBotChat() {
       const p = await validarPadre(dni);
       setIsTyping(false);
       setPadre(p);
+      setHijoElegido(null);
+      const hijos = p.estudiantes || [];
       await botMsg(
         null,
         <div className="id-card">
@@ -420,7 +425,14 @@ export default function EduBotChat() {
       );
       if (destino === PASOS.MIS_CITAS) {
         setPaso(PASOS.MIS_CITAS);
+      } else if (hijos.length > 1) {
+        // El padre tiene más de un hijo registrado: hay que preguntar
+        // explícitamente para cuál de ellos es la cita, en vez de asumir
+        // siempre el primero.
+        await botMsg('Veo que tienes más de un hijo registrado. ¿Para cuál de ellos es la cita?');
+        setPaso(PASOS.ELEGIR_HIJO);
       } else {
+        if (hijos.length === 1) setHijoElegido(hijos[0]);
         await botMsg('¿Con qué docente deseas la cita?');
         // Cargar docentes del backend
         const lista = await listarDocentes();
@@ -431,6 +443,15 @@ export default function EduBotChat() {
       setIsTyping(false);
       await botMsg('❌ No encontré ese DNI en nuestro sistema. Verifica el número e intenta nuevamente.');
     }
+  }
+
+  async function handleHijoSelect(hijo) {
+    setHijoElegido(hijo);
+    addMsg({ from: 'user', text: `${hijo.nombre} ${hijo.apellido}` });
+    await botMsg('¿Con qué docente deseas la cita?');
+    const lista = await listarDocentes();
+    setDocentes(lista);
+    setPaso(PASOS.ELEGIR_DOCENTE);
   }
 
   async function handleDocenteSelect(opt) {
@@ -506,11 +527,12 @@ export default function EduBotChat() {
         docenteId: docenteElegido.id,
         disponibilidadId: slot.disponibilidadId,
         motivo: motivoUsado?.id || motivoUsado?.label || 'rendimiento',
+        estudianteId: hijoElegido?.id ?? null,
       });
 
       addMsg({
         from: 'bot',
-        card: <TarjetaConfirmacion cita={{ ...resultado, motivo: motivoUsado?.label }} />,
+        card: <TarjetaConfirmacion cita={{ ...resultado, motivo: motivoUsado?.label, estudiante: hijoElegido ? `${hijoElegido.nombre} ${hijoElegido.apellido}` : null }} />,
         time: nowTime(),
       });
       setPaso(PASOS.CONFIRMADO);
@@ -565,6 +587,7 @@ export default function EduBotChat() {
 
     // ── Fallback contextual según el paso actual ───────────────────────────
     const sugerenciaPaso = {
+      [PASOS.ELEGIR_HIJO]:    'Usa los botones de abajo para indicar para cuál hijo es la cita. 👇',
       [PASOS.ELEGIR_DOCENTE]: 'Usa los botones de abajo para elegir un docente. 👇',
       [PASOS.ELEGIR_MOTIVO]:  'Selecciona el motivo de la cita con los botones. 👇',
       [PASOS.IA_SUGERENCIA]:  'Elige un horario sugerido o presiona "Ver todos". 👇',
@@ -612,6 +635,18 @@ export default function EduBotChat() {
           <button className="qr-btn" onClick={() => handleMenuSelect({ id: 'ayuda', label: 'Ayuda' })}>
             <IcoAyuda /> Ayuda
           </button>
+        </div>
+      );
+    }
+    if (paso === PASOS.ELEGIR_HIJO) {
+      const hijos = padre?.estudiantes || [];
+      return (
+        <div className="quick-replies">
+          {hijos.map(h => (
+            <button key={h.id} className="qr-btn" onClick={() => handleHijoSelect(h)}>
+              <IcoDocente /> {h.nombre} {h.apellido}{h.grado ? ` · ${h.grado}${h.seccion || ''}` : ''}
+            </button>
+          ))}
         </div>
       );
     }

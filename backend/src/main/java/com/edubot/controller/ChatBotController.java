@@ -59,8 +59,26 @@ public class ChatBotController {
                     resp.put("id", padre.getId());
                     resp.put("nombre", padre.getNombre());
                     resp.put("apellido", padre.getApellido());
+
+                    // Se devuelve la lista COMPLETA de hijos (no solo el primero),
+                    // para que el chatbot pueda preguntar por cuál hijo es la cita
+                    // cuando el padre tiene más de uno registrado.
                     List<Estudiante> hijos = estudianteRepository.findByPadreId(padre.getId());
-                    if (!hijos.isEmpty()) {
+                    List<Map<String, Object>> hijosFormateados = hijos.stream().map(h -> {
+                        Map<String, Object> hm = new LinkedHashMap<>();
+                        hm.put("id", h.getId());
+                        hm.put("nombre", h.getNombre());
+                        hm.put("apellido", h.getApellido());
+                        hm.put("grado", h.getGrado());
+                        hm.put("seccion", h.getSeccion());
+                        return hm;
+                    }).toList();
+                    resp.put("estudiantes", hijosFormateados);
+
+                    // Se mantienen estos dos campos (compatibilidad hacia atrás / saludo
+                    // inicial) solo cuando el padre tiene un único hijo registrado; si
+                    // tiene varios, el chatbot debe preguntar explícitamente por cuál es.
+                    if (hijos.size() == 1) {
                         Estudiante hijo = hijos.get(0);
                         resp.put("nombreEstudiante", hijo.getNombre() + " " + hijo.getApellido());
                         resp.put("gradoEstudiante", hijo.getGrado() + " " + hijo.getSeccion());
@@ -163,10 +181,35 @@ public class ChatBotController {
 
             // Bug corregido: antes la cita se guardaba sin vincular al
             // estudiante (estudiante_id quedaba null en la BD), aunque el
-            // modelo Cita sí contempla esa relación. Se recupera el primer
-            // hijo registrado del padre, igual que ya se hace en /padre/{dni}.
+            // modelo Cita sí contempla esa relación.
+            //
+            // Además, antes se tomaba SIEMPRE el primer hijo del padre
+            // (hijos.get(0)), sin importar cuántos hijos tuviera. Esto era
+            // incorrecto: si un padre tiene 2 o más hijos, la cita podía
+            // quedar vinculada al hijo equivocado. Ahora el frontend debe
+            // indicar explícitamente "estudianteId" (el chatbot le pregunta
+            // al padre por cuál hijo es la cita cuando hay más de uno). Solo
+            // si el padre tiene un único hijo se autocompleta sin preguntar.
             List<Estudiante> hijos = estudianteRepository.findByPadreId(padreId);
-            Estudiante estudiante = hijos.isEmpty() ? null : hijos.get(0);
+            Estudiante estudiante;
+
+            Object estudianteIdRaw = body.get("estudianteId");
+            if (estudianteIdRaw != null) {
+                Long estudianteId = Long.parseLong(estudianteIdRaw.toString());
+                estudiante = hijos.stream()
+                        .filter(h -> h.getId().equals(estudianteId))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException(
+                                "El estudiante indicado no pertenece a este padre."));
+            } else if (hijos.size() == 1) {
+                estudiante = hijos.get(0);
+            } else if (hijos.isEmpty()) {
+                estudiante = null;
+            } else {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Este padre tiene varios hijos registrados. Debes indicar " +
+                                 "para cuál de ellos es la cita (campo 'estudianteId')."));
+            }
 
             if (!disp.isDisponible())
                 return ResponseEntity.badRequest()

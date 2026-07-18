@@ -45,6 +45,10 @@ import java.util.stream.Collectors;
 @Tag(name = "Panel Administrativo", description = "Dashboard, reportes y gestión de docentes/padres (HU008, HU009)")
 public class AdminPanelController {
 
+    // Solo letras (con tildes/ñ) y espacios — nombres y apellidos no deben
+    // aceptar números ni caracteres especiales.
+    private static final String NOMBRE_REGEX = "^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\\s]+$";
+
     private final DashboardService dashboardService;
     private final ExportacionService exportacionService;
     private final DisponibilidadRepository disponibilidadRepository;
@@ -342,10 +346,17 @@ public class AdminPanelController {
         String apellido = (String) body.get("apellido");
 
         if (dni == null || !dni.matches("\\d{8}")) {
-            return ResponseEntity.badRequest().body(Map.of("error", "El DNI debe tener 8 dígitos"));
+            return ResponseEntity.badRequest().body(Map.of("error", "El DNI debe tener exactamente 8 dígitos numéricos"));
         }
         if (nombre == null || nombre.isBlank() || apellido == null || apellido.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "nombre y apellido son requeridos"));
+        }
+        if (!nombre.trim().matches(NOMBRE_REGEX) || !apellido.trim().matches(NOMBRE_REGEX)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "nombre y apellido solo pueden contener letras"));
+        }
+        String telefono = (String) body.get("telefono");
+        if (telefono != null && !telefono.isBlank() && !telefono.trim().matches("\\d{9}")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El teléfono debe tener exactamente 9 dígitos numéricos"));
         }
         if (padreRepository.findByDni(dni).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Ya existe un padre registrado con ese DNI"));
@@ -393,6 +404,9 @@ public class AdminPanelController {
         String apellido = (String) body.get("apellido");
         if (nombre == null || nombre.isBlank() || apellido == null || apellido.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "nombre y apellido son requeridos"));
+        }
+        if (!nombre.trim().matches(NOMBRE_REGEX) || !apellido.trim().matches(NOMBRE_REGEX)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "nombre y apellido solo pueden contener letras"));
         }
 
         Estudiante estudiante = new Estudiante();
