@@ -9,6 +9,7 @@ import {
   exportarReporteBackend,
   listarDocentesAdmin,
   crearDocenteAdmin,
+  crearCredencialesDocente,
   resetearPasswordDocente,
   listarPadresAdmin,
   crearPadreAdmin,
@@ -338,40 +339,110 @@ function NuevoHijoModal({ padre, onClose, onCreated }) {
   );
 }
 
-// ── Formulario: Restablecer contraseña de docente ───────────────────────────
-function ResetPasswordModal({ docente, onClose, onDone }) {
+// ── Formulario: Crear credenciales / Restablecer contraseña de docente ──────
+function CredencialesModal({ docente, mode, onClose, onDone }) {
+  const sugerido =
+    mode === "crear"
+      ? `${docente.nombre}.${docente.apellido}`
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, "")
+      : docente.username || "";
+
+  const [username, setUsername] = useState(sugerido);
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [resultado, setResultado] = useState(null);
+  const [copiado, setCopiado] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
+    if (mode === "crear" && !username.trim()) {
+      setError("El usuario es obligatorio.");
+      return;
+    }
     if (!password || password.length < 4) {
       setError("La contraseña debe tener al menos 4 caracteres.");
       return;
     }
     setSaving(true);
     try {
-      await resetearPasswordDocente(docente.id, password);
-      onDone();
+      if (mode === "crear") {
+        const resp = await crearCredencialesDocente(docente.id, { username: username.trim(), password });
+        setResultado({ username: resp.username || username.trim(), password });
+      } else {
+        await resetearPasswordDocente(docente.id, password);
+        setResultado({ username: docente.username, password });
+      }
     } catch (err) {
-      setError(err.message || "No se pudo restablecer la contraseña.");
+      setError(err.message || "No se pudo completar la operación.");
     } finally {
       setSaving(false);
     }
   };
 
+  const copiar = () => {
+    const texto = `Usuario: ${resultado.username}\nContraseña: ${resultado.password}`;
+    navigator.clipboard?.writeText(texto);
+    setCopiado(true);
+  };
+
+  if (resultado) {
+    return (
+      <ModalCard
+        title={mode === "crear" ? "Credenciales creadas" : "Contraseña restablecida"}
+        subtitle={`${docente.nombre} ${docente.apellido}`}
+        onClose={onDone}
+      >
+        <div className="adm-form-success">
+          ✓ Entrega estos datos al docente por un medio seguro (WhatsApp, en persona, etc.)
+        </div>
+        <div className="adm-cred-result">
+          <div className="adm-cred-result-row">
+            <span className="adm-cred-result-label">Usuario</span>
+            <span className="adm-cred-result-value">{resultado.username}</span>
+          </div>
+          <div className="adm-cred-result-row">
+            <span className="adm-cred-result-label">Contraseña</span>
+            <span className="adm-cred-result-value">{resultado.password}</span>
+          </div>
+        </div>
+        <div className="adm-form-actions">
+          <button type="button" className="adm-btn-secondary" onClick={copiar}>
+            {copiado ? "✓ Copiado" : "Copiar datos"}
+          </button>
+          <button type="button" className="adm-btn-primary" onClick={onDone}>Listo</button>
+        </div>
+      </ModalCard>
+    );
+  }
+
   return (
     <ModalCard
-      title="Restablecer contraseña"
+      title={mode === "crear" ? "Crear credenciales" : "Restablecer contraseña"}
       subtitle={`${docente.nombre} ${docente.apellido}`}
       onClose={onClose}
     >
       <form onSubmit={submit}>
         {error && <div className="adm-form-error">⚠ {error}</div>}
+        {mode === "crear" && (
+          <div className="adm-form-field">
+            <label className="adm-form-label">Usuario <span className="req">*</span></label>
+            <input
+              className="adm-form-input"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="ricardo.flores"
+            />
+          </div>
+        )}
         <div className="adm-form-field">
-          <label className="adm-form-label">Nueva contraseña <span className="req">*</span></label>
+          <label className="adm-form-label">
+            {mode === "crear" ? "Contraseña" : "Nueva contraseña"} <span className="req">*</span>
+          </label>
           <input
             className="adm-form-input"
             type="text"
@@ -384,7 +455,7 @@ function ResetPasswordModal({ docente, onClose, onDone }) {
         <div className="adm-form-actions">
           <button type="button" className="adm-btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="adm-btn-primary" disabled={saving}>
-            {saving ? "Guardando…" : "Restablecer"}
+            {saving ? "Guardando…" : mode === "crear" ? "Crear credenciales" : "Restablecer"}
           </button>
         </div>
       </form>
@@ -411,7 +482,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const [loadingDocentesLista, setLoadingDocentesLista] = useState(false);
   const [errorDocentesLista, setErrorDocentesLista] = useState(null);
   const [showNuevoDocente, setShowNuevoDocente] = useState(false);
-  const [resetPasswordDocente, setResetPasswordDocente] = useState(null);
+  const [credencialesModal, setCredencialesModal] = useState(null); // { docente, mode: "crear" | "reset" }
 
   // Estado de padres de familia
   const [padres, setPadres] = useState([]);
@@ -814,15 +885,19 @@ export default function AdminDashboard({ user, onLogout }) {
                           </td>
                           <td>
                             {d.tieneCredenciales ? (
-                              <span className="adm-credencial-si">✓ Tiene acceso</span>
+                              <span className="adm-credencial-si">✓ {d.username}</span>
                             ) : (
                               <span className="adm-credencial-no">Sin credenciales</span>
                             )}
                           </td>
                           <td>
-                            {d.tieneCredenciales && (
-                              <button className="adm-btn-link-add" onClick={() => setResetPasswordDocente(d)}>
+                            {d.tieneCredenciales ? (
+                              <button className="adm-btn-link-add" onClick={() => setCredencialesModal({ docente: d, mode: "reset" })}>
                                 Restablecer contraseña
+                              </button>
+                            ) : (
+                              <button className="adm-btn-link-add" onClick={() => setCredencialesModal({ docente: d, mode: "crear" })}>
+                                + Crear credenciales
                               </button>
                             )}
                           </td>
@@ -1056,13 +1131,14 @@ export default function AdminDashboard({ user, onLogout }) {
           }}
         />
       )}
-      {resetPasswordDocente && (
-        <ResetPasswordModal
-          docente={resetPasswordDocente}
-          onClose={() => setResetPasswordDocente(null)}
+      {credencialesModal && (
+        <CredencialesModal
+          docente={credencialesModal.docente}
+          mode={credencialesModal.mode}
+          onClose={() => setCredencialesModal(null)}
           onDone={() => {
-            setResetPasswordDocente(null);
-            alert("Contraseña actualizada. Comunícasela al docente por un medio seguro.");
+            setCredencialesModal(null);
+            cargarDocentesLista();
           }}
         />
       )}

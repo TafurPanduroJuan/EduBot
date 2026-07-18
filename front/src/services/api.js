@@ -195,6 +195,16 @@ export const crearDocenteAdmin = (body) =>
   });
 
 /**
+ * POST /api/panel/admin/docentes/:docenteId/credenciales
+ * Crea credenciales de acceso para un docente que aún no las tiene.
+ */
+export const crearCredencialesDocente = (docenteId, { username, password }) =>
+  request(`/panel/admin/docentes/${docenteId}/credenciales`, {
+    method: 'POST',
+    body: JSON.stringify({ username, password }),
+  });
+
+/**
  * PATCH /api/panel/admin/docentes/:docenteId/password
  * Restablece la contraseña de acceso de un docente.
  */

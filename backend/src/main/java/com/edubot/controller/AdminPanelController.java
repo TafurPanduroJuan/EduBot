@@ -159,8 +159,9 @@ public class AdminPanelController {
             m.put("curso", d.getCurso());
             m.put("email", d.getEmail());
             m.put("activo", d.isActivo());
-            boolean tieneCredenciales = !usuarioPanelRepository.findByDocenteId(d.getId()).isEmpty();
-            m.put("tieneCredenciales", tieneCredenciales);
+            List<UsuarioPanel> credenciales = usuarioPanelRepository.findByDocenteId(d.getId());
+            m.put("tieneCredenciales", !credenciales.isEmpty());
+            m.put("username", credenciales.isEmpty() ? null : credenciales.get(0).getUsername());
             return m;
         }).collect(Collectors.toList());
         return ResponseEntity.ok(resultado);
@@ -223,6 +224,39 @@ public class AdminPanelController {
         }
 
         return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * POST /api/panel/admin/docentes/{docenteId}/credenciales
+     * Crea las credenciales de acceso para un docente que YA existe pero
+     * todavía no tiene usuario de panel (p. ej. fue registrado sin marcar
+     * "crear credenciales", o las tuvo y se depuraron duplicados).
+     * Si el docente ya tiene credenciales, devuelve error — para cambiar
+     * la contraseña se usa el endpoint de restablecer contraseña.
+     *
+     * Body: { "username": "ricardo.flores", "password": "colegio2026" }
+     */
+    @Operation(summary = "Crear credenciales de acceso para un docente existente")
+    @PostMapping("/docentes/{docenteId}/credenciales")
+    public ResponseEntity<?> crearCredencialesDocente(
+            @PathVariable Long docenteId,
+            @RequestBody Map<String, Object> body) {
+
+        String username = (String) body.get("username");
+        String password = (String) body.get("password");
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "username y password son requeridos"));
+        }
+
+        try {
+            UsuarioPanel usuario = authService.crearUsuarioDocente(username.trim(), password, docenteId);
+            return ResponseEntity.ok(Map.of(
+                    "mensaje", "Credenciales creadas correctamente.",
+                    "username", usuario.getUsername()
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     /**

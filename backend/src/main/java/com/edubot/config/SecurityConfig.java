@@ -21,22 +21,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * SecurityConfig — define qué rutas son públicas y cuáles requieren rol.
- *
- * Rutas públicas (sin token):
- *   POST /api/panel/auth/login
- *   GET  /api/edubot/**  (chatbot WhatsApp — acceso público)
- *   POST /api/edubot/**
- *
- * Rutas solo DOCENTE:
- *   GET/PUT /api/panel/docente/**
- *
- * Rutas solo ADMINISTRATIVO:
- *   GET/POST /api/panel/admin/**
- *
- * El backend valida el rol — el frontend no puede saltarse esta protección.
- */
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
