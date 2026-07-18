@@ -28,25 +28,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * AdminPanelController — endpoints exclusivos del panel ADMINISTRATIVO.
- *
- * Todas las rutas bajo /api/panel/admin/** ya están protegidas en SecurityConfig
- * con hasRole('ADMINISTRATIVO') — no se toca nada de seguridad existente.
- *
- * HU008 — Dashboard con métricas y alertas IA.
- * HU009 — Exportación de reportes (PDF/Excel/CSV) + gestión de disponibilidades.
- * NUEVO — Alta de docentes (+ credenciales), padres y estudiantes desde el
- *         panel, para no depender de tocar la base de datos directamente.
- */
+
 @RestController
 @RequestMapping("/api/panel/admin")
 @PreAuthorize("hasRole('ADMINISTRATIVO')")
 @Tag(name = "Panel Administrativo", description = "Dashboard, reportes y gestión de docentes/padres (HU008, HU009)")
 public class AdminPanelController {
 
-    // Solo letras (con tildes/ñ) y espacios — nombres y apellidos no deben
-    // aceptar números ni caracteres especiales.
     private static final String NOMBRE_REGEX = "^[A-Za-zÁÉÍÓÚáéíóúÑñÜü\\s]+$";
 
     private final DashboardService dashboardService;
@@ -104,6 +92,9 @@ public class AdminPanelController {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType(resultado.getContentType()));
             headers.setContentDispositionFormData("attachment", resultado.getNombreArchivo());
+            headers.setCacheControl("no-store, no-cache, must-revalidate, max-age=0");
+            headers.setPragma("no-cache");
+            headers.setExpires(0);
 
             return ResponseEntity.ok()
                     .headers(headers)
@@ -327,17 +318,7 @@ public class AdminPanelController {
         return ResponseEntity.ok(resultado);
     }
 
-    /**
-     * POST /api/panel/admin/padres
-     * Registra un nuevo padre de familia (necesario para que pueda
-     * identificarse por DNI en EduBot). Antes solo se podía insertar
-     * directamente en la tabla "padres".
-     *
-     * Body: {
-     *   "dni": "71234567", "nombre": "Rosa", "apellido": "Mamani",
-     *   "telefono": "987654321", "horarioLaboral": "tarde"
-     * }
-     */
+   
     @Operation(summary = "Registrar un nuevo padre de familia")
     @PostMapping("/padres")
     public ResponseEntity<?> crearPadre(@RequestBody Map<String, Object> body) {
@@ -383,12 +364,7 @@ public class AdminPanelController {
         ));
     }
 
-    /**
-     * POST /api/panel/admin/padres/{padreId}/estudiantes
-     * Vincula un hijo (estudiante) a un padre ya registrado.
-     *
-     * Body: { "nombre": "Luis", "apellido": "Mamani", "grado": "3ro", "seccion": "A" }
-     */
+  
     @Operation(summary = "Registrar un estudiante y vincularlo a un padre existente")
     @PostMapping("/padres/{padreId}/estudiantes")
     public ResponseEntity<?> crearEstudiante(
