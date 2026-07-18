@@ -5,7 +5,7 @@ import {
   listarDocentes,
   confirmarCita,
 } from '../services/api';
-// Capa IA desacoplada — separada de los servicios CRUD (Arquitectura M-V-C-BD)
+
 import AIService from '../integration/AIService';
 import MisCitas from './MisCitas';
 import '../assets/styles/EduBotChat.css';
@@ -233,6 +233,46 @@ export default function EduBotChat() {
   const bottomRef = useRef(null);
   const initDone = useRef(false);
 
+  // ── Accesibilidad: helpers de voz ───────────────────────────────────────────
+  const vozFemeninaRef = useRef(null);
+
+  // Selecciona y cachea una voz en español, priorizando voces femeninas.
+  const elegirVoz = useCallback(() => {
+    if (!('speechSynthesis' in window)) return null;
+    const voces = window.speechSynthesis.getVoices();
+    if (!voces.length) return null;
+
+    const esVoces = voces.filter(v => v.lang?.toLowerCase().startsWith('es'));
+    const candidatas = esVoces.length ? esVoces : voces;
+
+    // Heurística por nombre: muchas plataformas exponen nombres como
+    // "Google español", "Microsoft Helena", "Paulina", "Mónica", etc.
+    const nombresFemeninos = /female|mujer|helena|paulina|monica|mónica|lucia|lucía|elena|sabina|laura|maria|maría/i;
+    const femenina = candidatas.find(v => nombresFemeninos.test(v.name));
+
+    return femenina || candidatas[0] || null;
+  }, []);
+
+  // getVoices() suele cargar de forma asíncrona en el primer render
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return;
+    vozFemeninaRef.current = elegirVoz();
+    const handler = () => { vozFemeninaRef.current = elegirVoz(); };
+    window.speechSynthesis.addEventListener('voiceschanged', handler);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', handler);
+  }, [elegirVoz]);
+
+  // Quita emojis y símbolos decorativos antes de enviarlos al lector de voz,
+  // para que EduBot no "diga" el nombre del emoji ni símbolos como • o →.
+  function limpiarTextoParaVoz(texto) {
+    return texto
+      .replace(/\p{Extended_Pictographic}/gu, '')
+      .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, '')   // banderas
+      .replace(/[✓✔️→•·]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   const addMsg = useCallback((msg) => {
     setMensajes(prev => [...prev, { id: Date.now() + Math.random(), time: nowTime(), ...msg }]);
   }, []);
@@ -244,17 +284,20 @@ export default function EduBotChat() {
         setIsTyping(false);
         addMsg({ from: 'bot', text, card });
         // Lectura en voz alta del mensaje del bot, si el padre activó el modo voz.
-        if (text && vozActiva && 'speechSynthesis' in window) {
-          const utter = new SpeechSynthesisUtterance(text);
+        const textoLimpio = text ? limpiarTextoParaVoz(text) : '';
+        if (textoLimpio && vozActiva && 'speechSynthesis' in window) {
+          const utter = new SpeechSynthesisUtterance(textoLimpio);
           utter.lang = 'es-PE';
           utter.rate = 0.98;
+          const voz = vozFemeninaRef.current || elegirVoz();
+          if (voz) utter.voice = voz;
           window.speechSynthesis.cancel(); // evita solapar lecturas
           window.speechSynthesis.speak(utter);
         }
         resolve();
       }, delay);
     });
-  }, [addMsg, vozActiva]);
+  }, [addMsg, vozActiva, elegirVoz]);
 
   // Inicializa el reconocimiento de voz (Web Speech API) una sola vez
   useEffect(() => {
@@ -450,8 +493,7 @@ export default function EduBotChat() {
   }
 
   async function handleSlotSelect(slot, motivoParam) {
-    // motivoParam viene del closure cuando se selecciona desde IA
-    // motivo (estado) es el fallback cuando se selecciona desde el calendario manual
+
     const motivoUsado = motivoParam || motivo;
 
     addMsg({ from: 'user', text: `${slot.horaInicio} – ${slot.horaFin}` });

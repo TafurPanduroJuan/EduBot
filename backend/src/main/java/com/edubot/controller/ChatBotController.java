@@ -23,7 +23,6 @@ public class ChatBotController {
     @Autowired private CitaRepository citaRepository;
     @Autowired private DisponibilidadRepository disponibilidadRepository;
 
-    /** Capa IA — el controlador solo conoce la interfaz, nunca la implementación */
     @Autowired
     private AIService aiService;
 
@@ -86,9 +85,6 @@ public class ChatBotController {
         Padre padre = padreRepository.findById(padreId).orElse(null);
         if (padre == null) return ResponseEntity.notFound().build();
 
-        // Ítem 2.2: si el mismo padre consultó este mismo docente/motivo hace
-        // menos de 5 minutos, reutilizamos la respuesta en vez de recalcular
-        // el ranking y volver a llamar a la API externa de IA.
         String cacheKey = padreId + "-" + docenteId + "-" + motivo;
         CacheEntry cacheado = sugerenciasCache.get(cacheKey);
         if (cacheado != null && cacheado.vigente()) {
