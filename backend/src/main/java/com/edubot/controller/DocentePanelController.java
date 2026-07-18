@@ -192,6 +192,7 @@ public class DocentePanelController {
     @PatchMapping("/citas/{id}/completar")
     public ResponseEntity<?> completarCita(
             @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> body,
             HttpServletRequest request) {
 
         Long docenteId = extraerDocenteId(request);
@@ -213,10 +214,16 @@ public class DocentePanelController {
 
         cita.setEstado("completada");
 
+        
+     
+        boolean asistio = body == null || body.get("asistio") == null
+                || Boolean.TRUE.equals(body.get("asistio"));
+        cita.setAsistio(asistio);
+
         citaRepository.save(cita);
 
         return ResponseEntity.ok(
-            Map.of("mensaje", "Cita marcada como completada.")
+            Map.of("mensaje", "Cita marcada como completada.", "asistio", asistio)
         );
     }
 }

@@ -23,9 +23,18 @@ public class ChatBotController {
     @Autowired private CitaRepository citaRepository;
     @Autowired private DisponibilidadRepository disponibilidadRepository;
 
+    /** Capa IA — el controlador solo conoce la interfaz, nunca la implementación */
     @Autowired
     private AIService aiService;
 
+    // ── Ítem 2.2 del framework de sostenibilidad (Uso de Recursos) ─────────────
+    // Caché de corto plazo (TTL) por combinación padre-docente-motivo, para
+    // evitar recalcular el ranking de IaPrediccionService y, sobre todo, para
+    // evitar llamadas repetidas a la API externa de Anthropic
+    // (aiService.generarMensajeBienvenida) cuando el mismo padre consulta el
+    // mismo docente varias veces en pocos minutos (ej. navega atrás y adelante
+    // en el chat). No requiere dependencias nuevas: usa un ConcurrentHashMap
+    // simple con expiración manual.
     private static final long SUGERENCIAS_TTL_MS = 5 * 60 * 1000; // 5 minutos
     private final Map<String, CacheEntry> sugerenciasCache = new ConcurrentHashMap<>();
 
@@ -85,6 +94,9 @@ public class ChatBotController {
         Padre padre = padreRepository.findById(padreId).orElse(null);
         if (padre == null) return ResponseEntity.notFound().build();
 
+        // Ítem 2.2: si el mismo padre consultó este mismo docente/motivo hace
+        // menos de 5 minutos, reutilizamos la respuesta en vez de recalcular
+        // el ranking y volver a llamar a la API externa de IA.
         String cacheKey = padreId + "-" + docenteId + "-" + motivo;
         CacheEntry cacheado = sugerenciasCache.get(cacheKey);
         if (cacheado != null && cacheado.vigente()) {
@@ -149,6 +161,13 @@ public class ChatBotController {
             DisponibilidadDocente disp = disponibilidadRepository.findById(dispId).orElseThrow(
                     () -> new RuntimeException("Horario no encontrado con id: " + dispId));
 
+            // Bug corregido: antes la cita se guardaba sin vincular al
+            // estudiante (estudiante_id quedaba null en la BD), aunque el
+            // modelo Cita sí contempla esa relación. Se recupera el primer
+            // hijo registrado del padre, igual que ya se hace en /padre/{dni}.
+            List<Estudiante> hijos = estudianteRepository.findByPadreId(padreId);
+            Estudiante estudiante = hijos.isEmpty() ? null : hijos.get(0);
+
             if (!disp.isDisponible())
                 return ResponseEntity.badRequest()
                         .body(Map.of("error", "El horario ya no está disponible. Por favor elige otro."));
@@ -160,6 +179,7 @@ public class ChatBotController {
             cita.setTicket("EDU-" + String.format("%04d", (int)(Math.random() * 9000 + 1000)));
             cita.setPadre(padre);
             cita.setDocente(docente);
+            cita.setEstudiante(estudiante);
             cita.setFecha(disp.getFecha());
             cita.setHoraInicio(disp.getHoraInicio());
             cita.setHoraFin(disp.getHoraFin());

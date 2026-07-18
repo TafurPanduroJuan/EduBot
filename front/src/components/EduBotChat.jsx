@@ -5,7 +5,7 @@ import {
   listarDocentes,
   confirmarCita,
 } from '../services/api';
-
+// Capa IA desacoplada — separada de los servicios CRUD (Arquitectura M-V-C-BD)
 import AIService from '../integration/AIService';
 import MisCitas from './MisCitas';
 import '../assets/styles/EduBotChat.css';
@@ -493,7 +493,8 @@ export default function EduBotChat() {
   }
 
   async function handleSlotSelect(slot, motivoParam) {
-
+    // motivoParam viene del closure cuando se selecciona desde IA
+    // motivo (estado) es el fallback cuando se selecciona desde el calendario manual
     const motivoUsado = motivoParam || motivo;
 
     addMsg({ from: 'user', text: `${slot.horaInicio} – ${slot.horaFin}` });

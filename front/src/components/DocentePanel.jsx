@@ -116,6 +116,39 @@ function parseActaEstructurada(texto) {
   return resultado;
 }
 
+// Convierte el texto plano que devuelve la IA (Motivo: / Historial: / Puntos
+// sugeridos:) en un objeto { motivo, historial, puntos } para poder
+// renderizarlo como tarjetas en vez de un párrafo plano o JSON crudo.
+function parseBriefing(texto) {
+  const secciones = ['Motivo:', 'Historial:', 'Puntos sugeridos:'];
+  const claves = ['motivo', 'historial', 'puntos'];
+  const resultado = { motivo: '', historial: '', puntos: '' };
+
+  if (!texto) return resultado;
+
+  secciones.forEach((marcador, i) => {
+    const inicio = texto.indexOf(marcador);
+    if (inicio === -1) return;
+
+    let fin = texto.length;
+    secciones.forEach((otro, j) => {
+      if (j === i) return;
+      const idxOtro = texto.indexOf(otro, inicio + marcador.length);
+      if (idxOtro > -1 && idxOtro < fin) fin = idxOtro;
+    });
+
+    resultado[claves[i]] = texto.substring(inicio + marcador.length, fin).trim();
+  });
+
+  // Si el texto no trae los marcadores esperados (ej. vino en otro formato),
+  // lo dejamos completo en "puntos" para no perder información.
+  if (!resultado.motivo && !resultado.historial && !resultado.puntos) {
+    resultado.puntos = texto;
+  }
+
+  return resultado;
+}
+
 export default function DocentePanel({ user, onLogout }) {
   const [activeNav, setActiveNav]             = useState('disponibilidad');
   const [grilla, setGrilla]                   = useState(iniciarGrilla);
@@ -273,12 +306,14 @@ export default function DocentePanel({ user, onLogout }) {
     setLoadingBriefing(true);
     try {
       const resp = await obtenerBriefingCita(cita.id);
-      setBriefing({ citaId: cita.id, texto: resp?.resumen || resp?.texto || JSON.stringify(resp) });
+      // El backend devuelve el campo "briefingIA" (ver CitaContextoController).
+      // Antes se buscaba resp.resumen / resp.texto, que no existen, así que
+      // siempre caía al respaldo JSON.stringify(resp) — de ahí el JSON crudo.
+      const textoIA = resp?.briefingIA || resp?.resumen || resp?.texto || '';
+      setBriefing({ citaId: cita.id, texto: textoIA, ...parseBriefing(textoIA) });
     } catch {
-      setBriefing({
-        citaId: cita.id,
-        texto: `Motivo: ${cita.motivo}. Sin historial adicional disponible en este momento.`,
-      });
+      const fallback = `Motivo: ${cita.motivo}. Sin historial adicional disponible en este momento.`;
+      setBriefing({ citaId: cita.id, texto: fallback, ...parseBriefing(fallback) });
     } finally {
       setLoadingBriefing(false);
     }
@@ -587,7 +622,35 @@ export default function DocentePanel({ user, onLogout }) {
                       <span className="dp-ia-badge" style={{ marginBottom: 10, display: 'inline-block' }}>
                         ✦ Briefing IA
                       </span>
-                      <p style={{ fontSize: 13, lineHeight: 1.6 }}>{briefing.texto}</p>
+                      <div className="dp-briefing-secciones">
+                        {briefing.motivo && (
+                          <div className="dp-briefing-seccion">
+                            <span className="dp-briefing-seccion-icono">📌</span>
+                            <div>
+                              <span className="dp-briefing-seccion-titulo">Motivo</span>
+                              <p>{briefing.motivo}</p>
+                            </div>
+                          </div>
+                        )}
+                        {briefing.historial && (
+                          <div className="dp-briefing-seccion">
+                            <span className="dp-briefing-seccion-icono">🗂️</span>
+                            <div>
+                              <span className="dp-briefing-seccion-titulo">Historial</span>
+                              <p>{briefing.historial}</p>
+                            </div>
+                          </div>
+                        )}
+                        {briefing.puntos && (
+                          <div className="dp-briefing-seccion">
+                            <span className="dp-briefing-seccion-icono">💡</span>
+                            <div>
+                              <span className="dp-briefing-seccion-titulo">Puntos sugeridos</span>
+                              <p>{briefing.puntos}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {(citaActiva.estado === 'Pendiente' || citaActiva.estado === 'Confirmada') && (
                       <div className="dp-briefing-btns">
