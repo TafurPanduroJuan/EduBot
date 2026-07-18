@@ -223,6 +223,13 @@ export default function EduBotChat() {
   const [horariosData, setHorariosData] = useState(null); // { sugerenciasIA, todosLosHorarios }
   const [fechaSelCalendario, setFechaSelCalendario] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
+
+  // ── Accesibilidad: voz (Ítem 1 del framework — Accesibilidad e Inclusión) ──
+  const [escuchando, setEscuchando] = useState(false);      // mic activo (STT)
+  const [vozActiva, setVozActiva] = useState(false);        // lectura en voz alta (TTS)
+  const [vozSoportada, setVozSoportada] = useState(true);
+  const reconocimientoRef = useRef(null);
+
   const bottomRef = useRef(null);
   const initDone = useRef(false);
 
@@ -236,10 +243,63 @@ export default function EduBotChat() {
       setTimeout(() => {
         setIsTyping(false);
         addMsg({ from: 'bot', text, card });
+        // Lectura en voz alta del mensaje del bot, si el padre activó el modo voz.
+        if (text && vozActiva && 'speechSynthesis' in window) {
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = 'es-PE';
+          utter.rate = 0.98;
+          window.speechSynthesis.cancel(); // evita solapar lecturas
+          window.speechSynthesis.speak(utter);
+        }
         resolve();
       }, delay);
     });
-  }, [addMsg]);
+  }, [addMsg, vozActiva]);
+
+  // Inicializa el reconocimiento de voz (Web Speech API) una sola vez
+  useEffect(() => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      setVozSoportada(false);
+      return;
+    }
+    const rec = new SpeechRecognitionAPI();
+    rec.lang = 'es-PE';
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = (event) => {
+      const transcripcion = event.results[0][0].transcript;
+      setInput(transcripcion);
+      // Enviamos automáticamente, igual que si el padre hubiese tocado "Enviar"
+      setTimeout(() => handleSendRef.current?.(transcripcion), 150);
+    };
+    rec.onerror = () => setEscuchando(false);
+    rec.onend = () => setEscuchando(false);
+
+    reconocimientoRef.current = rec;
+    return () => rec.stop();
+  }, []);
+
+  // Ref para poder llamar a handleSend (definido más abajo) desde el callback de voz
+  const handleSendRef = useRef(null);
+
+  function toggleEscuchar() {
+    const rec = reconocimientoRef.current;
+    if (!rec) return;
+    if (escuchando) {
+      rec.stop();
+      setEscuchando(false);
+    } else {
+      try {
+        rec.start();
+        setEscuchando(true);
+      } catch {
+        // Si ya estaba iniciado (doble click rápido), lo ignoramos
+      }
+    }
+  }
 
   // Init
   useEffect(() => {
@@ -417,8 +477,8 @@ export default function EduBotChat() {
     }
   }
 
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(textoVoz) {
+    const text = (typeof textoVoz === 'string' ? textoVoz : input).trim();
     if (!text) return;
     setInput('');
     addMsg({ from: 'user', text });
@@ -473,6 +533,10 @@ export default function EduBotChat() {
 
     await botMsg(msg);
   }
+
+  useEffect(() => {
+    handleSendRef.current = handleSend;
+  });
 
   // Construir mapa de disponibilidad para el selector manual
   function buildDisponibilidadMap() {
@@ -582,10 +646,24 @@ export default function EduBotChat() {
               🗂️
             </button>
           )}
+          <button
+            className="hdr-btn"
+            title={vozActiva ? 'Desactivar lectura en voz alta' : 'Activar lectura en voz alta (accesibilidad)'}
+            aria-pressed={vozActiva}
+            onClick={() => setVozActiva(v => !v)}
+          >
+            {vozActiva ? '🔊' : '🔈'}
+          </button>
           <button className="hdr-btn">🔍</button>
           <button className="hdr-btn">⋮</button>
         </div>
       </div>
+
+      {vozActiva && (
+        <div className="voz-banner" role="status">
+          🔊 Modo de lectura en voz alta activado — EduBot leerá sus respuestas.
+        </div>
+      )}
 
       <div className="chat-messages">
         {mensajes.map(msg => <Burbuja key={msg.id} msg={msg} />)}
@@ -606,14 +684,25 @@ export default function EduBotChat() {
         <button className="inp-attach">😊</button>
         <input
           className="chat-input"
-          placeholder="Escribe un mensaje..."
+          placeholder={escuchando ? 'Escuchando... habla ahora 🎙️' : 'Escribe un mensaje o toca el micrófono...'}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
         />
-        <button className="inp-send" onClick={handleSend}>
-          {input.trim() ? '➤' : '🎤'}
-        </button>
+        {input.trim() ? (
+          <button className="inp-send" onClick={() => handleSend()}>➤</button>
+        ) : (
+          vozSoportada && (
+            <button
+              className={`inp-send inp-mic ${escuchando ? 'mic-activo' : ''}`}
+              onClick={toggleEscuchar}
+              title={escuchando ? 'Detener' : 'Hablar con EduBot'}
+              aria-label="Agendar cita por voz"
+            >
+              {escuchando ? '⏹️' : '🎤'}
+            </button>
+          )
+        )}
       </div>
     </div>
   );
