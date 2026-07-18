@@ -11,10 +11,6 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * DashboardService — calcula las métricas del panel administrativo (HU008)
- * y delega en AIService la generación de alertas/insights.
- */
 @Service
 public class DashboardService {
 
@@ -41,7 +37,14 @@ public class DashboardService {
         LocalDate inicio = calcularInicio(hoy, periodo);
 
         List<Cita> todasLasCitas = citaRepository.findAll().stream()
-                .filter(c -> !c.getFecha().isBefore(inicio) && !c.getFecha().isAfter(hoy))
+                .filter(c -> {
+                    LocalDate referencia = c.getCreatedAt() != null
+                            ? c.getCreatedAt().toLocalDate()
+                            : c.getFecha();
+                    return referencia != null
+                            && !referencia.isBefore(inicio)
+                            && !referencia.isAfter(hoy);
+                })
                 .collect(Collectors.toList());
 
         List<Cita> completadas = todasLasCitas.stream()
