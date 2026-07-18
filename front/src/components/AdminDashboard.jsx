@@ -9,6 +9,7 @@ import {
   exportarReporteBackend,
   listarDocentesAdmin,
   crearDocenteAdmin,
+  resetearPasswordDocente,
   listarPadresAdmin,
   crearPadreAdmin,
   crearEstudianteAdmin,
@@ -337,6 +338,60 @@ function NuevoHijoModal({ padre, onClose, onCreated }) {
   );
 }
 
+// ── Formulario: Restablecer contraseña de docente ───────────────────────────
+function ResetPasswordModal({ docente, onClose, onDone }) {
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!password || password.length < 4) {
+      setError("La contraseña debe tener al menos 4 caracteres.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await resetearPasswordDocente(docente.id, password);
+      onDone();
+    } catch (err) {
+      setError(err.message || "No se pudo restablecer la contraseña.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalCard
+      title="Restablecer contraseña"
+      subtitle={`${docente.nombre} ${docente.apellido}`}
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        {error && <div className="adm-form-error">⚠ {error}</div>}
+        <div className="adm-form-field">
+          <label className="adm-form-label">Nueva contraseña <span className="req">*</span></label>
+          <input
+            className="adm-form-input"
+            type="text"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="colegio2026"
+            autoFocus
+          />
+        </div>
+        <div className="adm-form-actions">
+          <button type="button" className="adm-btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="adm-btn-primary" disabled={saving}>
+            {saving ? "Guardando…" : "Restablecer"}
+          </button>
+        </div>
+      </form>
+    </ModalCard>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────────────────
 export default function AdminDashboard({ user, onLogout }) {
   const [activeNav, setActiveNav] = useState("dashboard");
@@ -356,6 +411,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const [loadingDocentesLista, setLoadingDocentesLista] = useState(false);
   const [errorDocentesLista, setErrorDocentesLista] = useState(null);
   const [showNuevoDocente, setShowNuevoDocente] = useState(false);
+  const [resetPasswordDocente, setResetPasswordDocente] = useState(null);
 
   // Estado de padres de familia
   const [padres, setPadres] = useState([]);
@@ -735,12 +791,13 @@ export default function AdminDashboard({ user, onLogout }) {
                         <th>Email</th>
                         <th>Estado</th>
                         <th>Credenciales</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {docentesLista.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="adm-empty">
+                          <td colSpan={6} className="adm-empty">
                             Aún no hay docentes registrados
                           </td>
                         </tr>
@@ -760,6 +817,13 @@ export default function AdminDashboard({ user, onLogout }) {
                               <span className="adm-credencial-si">✓ Tiene acceso</span>
                             ) : (
                               <span className="adm-credencial-no">Sin credenciales</span>
+                            )}
+                          </td>
+                          <td>
+                            {d.tieneCredenciales && (
+                              <button className="adm-btn-link-add" onClick={() => setResetPasswordDocente(d)}>
+                                Restablecer contraseña
+                              </button>
                             )}
                           </td>
                         </tr>
@@ -989,6 +1053,16 @@ export default function AdminDashboard({ user, onLogout }) {
           onCreated={() => {
             setShowNuevoPadre(false);
             cargarPadres();
+          }}
+        />
+      )}
+      {resetPasswordDocente && (
+        <ResetPasswordModal
+          docente={resetPasswordDocente}
+          onClose={() => setResetPasswordDocente(null)}
+          onDone={() => {
+            setResetPasswordDocente(null);
+            alert("Contraseña actualizada. Comunícasela al docente por un medio seguro.");
           }}
         />
       )}

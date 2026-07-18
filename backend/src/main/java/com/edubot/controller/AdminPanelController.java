@@ -225,6 +225,35 @@ public class AdminPanelController {
         return ResponseEntity.ok(resp);
     }
 
+    /**
+     * PATCH /api/panel/admin/docentes/{docenteId}/password
+     * Restablece la contraseña de acceso de un docente (cuando la perdió
+     * u olvidó, o cuando se limpiaron credenciales duplicadas).
+     *
+     * Body: { "password": "nuevaClave123" }
+     */
+    @Operation(summary = "Restablecer la contraseña de un docente")
+    @PatchMapping("/docentes/{docenteId}/password")
+    public ResponseEntity<?> resetearPasswordDocente(
+            @PathVariable Long docenteId,
+            @RequestBody Map<String, Object> body) {
+
+        String password = (String) body.get("password");
+        if (password == null || password.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "La nueva contraseña es requerida"));
+        }
+        if (password.length() < 4) {
+            return ResponseEntity.badRequest().body(Map.of("error", "La contraseña debe tener al menos 4 caracteres"));
+        }
+
+        try {
+            authService.resetearPasswordPorDocente(docenteId, password);
+            return ResponseEntity.ok(Map.of("mensaje", "Contraseña actualizada correctamente."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // GESTIÓN DE PADRES Y ESTUDIANTES
     // ═══════════════════════════════════════════════════════════════════════

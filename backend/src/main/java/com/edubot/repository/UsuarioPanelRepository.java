@@ -14,6 +14,5 @@ public interface UsuarioPanelRepository extends JpaRepository<UsuarioPanel, Long
 
     boolean existsByUsername(String username);
 
-
     List<UsuarioPanel> findByDocenteId(Long docenteId);
 }

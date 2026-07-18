@@ -194,21 +194,43 @@ export const crearDocenteAdmin = (body) =>
     body: JSON.stringify(body),
   });
 
+/**
+ * PATCH /api/panel/admin/docentes/:docenteId/password
+ * Restablece la contraseña de acceso de un docente.
+ */
+export const resetearPasswordDocente = (docenteId, password) =>
+  request(`/panel/admin/docentes/${docenteId}/password`, {
+    method: 'PATCH',
+    body: JSON.stringify({ password }),
+  });
+
 /* ===================================================
    PANEL ADMINISTRATIVO — GESTIÓN DE PADRES Y ESTUDIANTES
 =================================================== */
 
+/**
+ * GET /api/panel/admin/padres
+ * Lista todos los padres registrados junto con sus hijos vinculados.
+ */
 export const listarPadresAdmin = () =>
   request('/panel/admin/padres');
 
-
+/**
+ * POST /api/panel/admin/padres
+ * Registra un nuevo padre de familia.
+ * body: { dni, nombre, apellido, telefono, horarioLaboral }
+ */
 export const crearPadreAdmin = (body) =>
   request('/panel/admin/padres', {
     method: 'POST',
     body: JSON.stringify(body),
   });
 
-
+/**
+ * POST /api/panel/admin/padres/:padreId/estudiantes
+ * Vincula un hijo (estudiante) a un padre ya registrado.
+ * body: { nombre, apellido, grado, seccion }
+ */
 export const crearEstudianteAdmin = (padreId, body) =>
   request(`/panel/admin/padres/${padreId}/estudiantes`, {
     method: 'POST',

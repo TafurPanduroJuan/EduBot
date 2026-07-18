@@ -90,9 +90,7 @@ public class AuthService {
         return usuarioRepo.save(u);
     }
 
-    /**
-     * Crea un usuario ADMINISTRATIVO.
-     */
+
     @Transactional
     public UsuarioPanel crearUsuarioAdmin(String username, String password) {
         if (usuarioRepo.existsByUsername(username)) {
@@ -104,5 +102,19 @@ public class AuthService {
         u.setPassword(passwordEncoder.encode(password));
         u.setRol(UsuarioPanel.Rol.ADMINISTRATIVO);
         return usuarioRepo.save(u);
+    }
+
+   
+    @Transactional
+    public void resetearPasswordPorDocente(Long docenteId, String nuevaPassword) {
+        java.util.List<UsuarioPanel> usuarios = usuarioRepo.findByDocenteId(docenteId);
+        if (usuarios.isEmpty()) {
+            throw new RuntimeException("Este docente no tiene credenciales de acceso registradas");
+        }
+       
+        for (UsuarioPanel u : usuarios) {
+            u.setPassword(passwordEncoder.encode(nuevaPassword));
+            usuarioRepo.save(u);
+        }
     }
 }
