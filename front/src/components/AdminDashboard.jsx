@@ -7,6 +7,11 @@ import {
   obtenerResumenDashboard,
   obtenerTodasDisponibilidades,
   exportarReporteBackend,
+  listarDocentesAdmin,
+  crearDocenteAdmin,
+  listarPadresAdmin,
+  crearPadreAdmin,
+  crearEstudianteAdmin,
 } from "../services/api";
 
 // ── Colores y helpers ────────────────────────────────────────────────────────
@@ -51,6 +56,287 @@ function MotivosBars({ motivos }) {
   );
 }
 
+// ── Modal genérico ───────────────────────────────────────────────────────────
+function ModalCard({ title, subtitle, onClose, children }) {
+  return (
+    <div className="adm-modal-overlay" onClick={onClose}>
+      <div className="adm-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="adm-modal-header">
+          <div>
+            <h3 className="adm-modal-title">{title}</h3>
+            {subtitle && <p className="adm-modal-subtitle">{subtitle}</p>}
+          </div>
+          <button className="adm-modal-close" onClick={onClose}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Formulario: Nuevo Docente ────────────────────────────────────────────────
+function NuevoDocenteModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({
+    nombre: "", apellido: "", curso: "", email: "",
+    crearCredenciales: false, username: "", password: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const set = (field) => (e) => {
+    const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setForm((f) => ({ ...f, [field]: value }));
+  };
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      setError("Nombre y apellido son obligatorios.");
+      return;
+    }
+    if (form.crearCredenciales && (!form.username.trim() || !form.password.trim())) {
+      setError("Si vas a crear credenciales, completa usuario y contraseña.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await crearDocenteAdmin({
+        nombre: form.nombre.trim(),
+        apellido: form.apellido.trim(),
+        curso: form.curso.trim() || null,
+        email: form.email.trim() || null,
+        crearCredenciales: form.crearCredenciales,
+        username: form.username.trim() || undefined,
+        password: form.password || undefined,
+      });
+      onCreated();
+    } catch (err) {
+      setError(err.message || "No se pudo registrar al docente.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalCard
+      title="Nuevo docente"
+      subtitle="Registra a un profesor y, si quieres, su acceso al panel"
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        {error && <div className="adm-form-error">⚠ {error}</div>}
+
+        <div className="adm-form-grid">
+          <div className="adm-form-field">
+            <label className="adm-form-label">Nombre <span className="req">*</span></label>
+            <input className="adm-form-input" value={form.nombre} onChange={set("nombre")} placeholder="Ricardo" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Apellido <span className="req">*</span></label>
+            <input className="adm-form-input" value={form.apellido} onChange={set("apellido")} placeholder="Flores" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Curso / materia</label>
+            <input className="adm-form-input" value={form.curso} onChange={set("curso")} placeholder="Comunicación" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Email</label>
+            <input className="adm-form-input" type="email" value={form.email} onChange={set("email")} placeholder="ricardo.flores@colegio.edu.pe" />
+          </div>
+        </div>
+
+        <label className="adm-form-checkbox-row">
+          <input type="checkbox" checked={form.crearCredenciales} onChange={set("crearCredenciales")} />
+          Crear credenciales de acceso al panel para este docente
+        </label>
+
+        {form.crearCredenciales && (
+          <div className="adm-form-grid">
+            <div className="adm-form-field">
+              <label className="adm-form-label">Usuario <span className="req">*</span></label>
+              <input className="adm-form-input" value={form.username} onChange={set("username")} placeholder="ricardo.flores" />
+            </div>
+            <div className="adm-form-field">
+              <label className="adm-form-label">Contraseña <span className="req">*</span></label>
+              <input className="adm-form-input" type="text" value={form.password} onChange={set("password")} placeholder="colegio2026" />
+            </div>
+          </div>
+        )}
+
+        <div className="adm-form-actions">
+          <button type="button" className="adm-btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="adm-btn-primary" disabled={saving}>
+            {saving ? "Guardando…" : "Registrar docente"}
+          </button>
+        </div>
+      </form>
+    </ModalCard>
+  );
+}
+
+// ── Formulario: Nuevo Padre de familia ───────────────────────────────────────
+function NuevoPadreModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({
+    dni: "", nombre: "", apellido: "", telefono: "", horarioLaboral: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!/^\d{8}$/.test(form.dni)) {
+      setError("El DNI debe tener exactamente 8 dígitos.");
+      return;
+    }
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      setError("Nombre y apellido son obligatorios.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await crearPadreAdmin({
+        dni: form.dni.trim(),
+        nombre: form.nombre.trim(),
+        apellido: form.apellido.trim(),
+        telefono: form.telefono.trim() || null,
+        horarioLaboral: form.horarioLaboral || null,
+      });
+      onCreated();
+    } catch (err) {
+      setError(err.message || "No se pudo registrar al padre de familia.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalCard
+      title="Nuevo padre de familia"
+      subtitle="Necesario para que el padre pueda identificarse por DNI en EduBot"
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        {error && <div className="adm-form-error">⚠ {error}</div>}
+
+        <div className="adm-form-field">
+          <label className="adm-form-label">DNI <span className="req">*</span></label>
+          <input
+            className="adm-form-input"
+            value={form.dni}
+            onChange={set("dni")}
+            placeholder="71234567"
+            maxLength={8}
+            inputMode="numeric"
+          />
+        </div>
+
+        <div className="adm-form-grid">
+          <div className="adm-form-field">
+            <label className="adm-form-label">Nombre <span className="req">*</span></label>
+            <input className="adm-form-input" value={form.nombre} onChange={set("nombre")} placeholder="Rosa" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Apellido <span className="req">*</span></label>
+            <input className="adm-form-input" value={form.apellido} onChange={set("apellido")} placeholder="Mamani" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Teléfono</label>
+            <input className="adm-form-input" value={form.telefono} onChange={set("telefono")} placeholder="987654321" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Horario laboral</label>
+            <select className="adm-form-select" value={form.horarioLaboral} onChange={set("horarioLaboral")}>
+              <option value="">Sin especificar</option>
+              <option value="manana">Mañana</option>
+              <option value="tarde">Tarde</option>
+              <option value="noche">Noche</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="adm-form-actions">
+          <button type="button" className="adm-btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="adm-btn-primary" disabled={saving}>
+            {saving ? "Guardando…" : "Registrar padre"}
+          </button>
+        </div>
+      </form>
+    </ModalCard>
+  );
+}
+
+// ── Formulario: Nuevo Hijo (vinculado a un padre) ───────────────────────────
+function NuevoHijoModal({ padre, onClose, onCreated }) {
+  const [form, setForm] = useState({ nombre: "", apellido: "", grado: "", seccion: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      setError("Nombre y apellido son obligatorios.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await crearEstudianteAdmin(padre.id, {
+        nombre: form.nombre.trim(),
+        apellido: form.apellido.trim(),
+        grado: form.grado.trim() || null,
+        seccion: form.seccion.trim() || null,
+      });
+      onCreated();
+    } catch (err) {
+      setError(err.message || "No se pudo vincular al estudiante.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ModalCard
+      title="Agregar hijo"
+      subtitle={`Vincular a ${padre.nombre} ${padre.apellido} (DNI ${padre.dni})`}
+      onClose={onClose}
+    >
+      <form onSubmit={submit}>
+        {error && <div className="adm-form-error">⚠ {error}</div>}
+        <div className="adm-form-grid">
+          <div className="adm-form-field">
+            <label className="adm-form-label">Nombre <span className="req">*</span></label>
+            <input className="adm-form-input" value={form.nombre} onChange={set("nombre")} placeholder="Luis" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Apellido <span className="req">*</span></label>
+            <input className="adm-form-input" value={form.apellido} onChange={set("apellido")} placeholder="Mamani" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Grado</label>
+            <input className="adm-form-input" value={form.grado} onChange={set("grado")} placeholder="3ro" />
+          </div>
+          <div className="adm-form-field">
+            <label className="adm-form-label">Sección</label>
+            <input className="adm-form-input" value={form.seccion} onChange={set("seccion")} placeholder="A" />
+          </div>
+        </div>
+        <div className="adm-form-actions">
+          <button type="button" className="adm-btn-secondary" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="adm-btn-primary" disabled={saving}>
+            {saving ? "Guardando…" : "Vincular hijo"}
+          </button>
+        </div>
+      </form>
+    </ModalCard>
+  );
+}
+
 // ── Componente principal ─────────────────────────────────────────────────────
 export default function AdminDashboard({ user, onLogout }) {
   const [activeNav, setActiveNav] = useState("dashboard");
@@ -61,9 +347,22 @@ export default function AdminDashboard({ user, onLogout }) {
   const [loadingDash, setLoadingDash] = useState(false);
   const [errorDash, setErrorDash] = useState(null);
 
-  // Estado de docentes
+  // Estado de docentes (disponibilidad, usado en el gráfico del dashboard)
   const [docentes, setDocentes] = useState([]);
   const [loadingDocentes, setLoadingDocentes] = useState(false);
+
+  // Estado de docentes registrados (para el formulario/listado de alta)
+  const [docentesLista, setDocentesLista] = useState([]);
+  const [loadingDocentesLista, setLoadingDocentesLista] = useState(false);
+  const [errorDocentesLista, setErrorDocentesLista] = useState(null);
+  const [showNuevoDocente, setShowNuevoDocente] = useState(false);
+
+  // Estado de padres de familia
+  const [padres, setPadres] = useState([]);
+  const [loadingPadres, setLoadingPadres] = useState(false);
+  const [errorPadres, setErrorPadres] = useState(null);
+  const [showNuevoPadre, setShowNuevoPadre] = useState(false);
+  const [hijoModalPadre, setHijoModalPadre] = useState(null);
 
   // UI
   const [alertasDismissed, setAlertasDismissed] = useState([]);
@@ -122,6 +421,44 @@ export default function AdminDashboard({ user, onLogout }) {
     cargarDocentes();
   }, [cargarDocentes]);
 
+  // ── Carga de docentes registrados (alta / listado admin) ────────────────
+  const cargarDocentesLista = useCallback(async () => {
+    if (activeNav !== "docentes") return;
+    setLoadingDocentesLista(true);
+    setErrorDocentesLista(null);
+    try {
+      const data = await listarDocentesAdmin();
+      setDocentesLista(data || []);
+    } catch (e) {
+      setErrorDocentesLista(e.message || "Error al cargar los docentes");
+    } finally {
+      setLoadingDocentesLista(false);
+    }
+  }, [activeNav]);
+
+  useEffect(() => {
+    cargarDocentesLista();
+  }, [cargarDocentesLista]);
+
+  // ── Carga de padres de familia ───────────────────────────────────────────
+  const cargarPadres = useCallback(async () => {
+    if (activeNav !== "padres") return;
+    setLoadingPadres(true);
+    setErrorPadres(null);
+    try {
+      const data = await listarPadresAdmin();
+      setPadres(data || []);
+    } catch (e) {
+      setErrorPadres(e.message || "Error al cargar los padres de familia");
+    } finally {
+      setLoadingPadres(false);
+    }
+  }, [activeNav]);
+
+  useEffect(() => {
+    cargarPadres();
+  }, [cargarPadres]);
+
   // ── Exportar desde backend ───────────────────────────────────────────────
   const exportar = async (formato) => {
     setExportando(formato);
@@ -159,6 +496,7 @@ export default function AdminDashboard({ user, onLogout }) {
   const navItems = [
     { key: "dashboard", icon: "⊞", label: "Dashboard" },
     { key: "docentes",  icon: "👤", label: "Docentes"  },
+    { key: "padres",    icon: "👪", label: "Padres"    },
     { key: "reportes",  icon: "⬇",  label: "Reportes"  },
   ];
 
@@ -362,12 +700,79 @@ export default function AdminDashboard({ user, onLogout }) {
             <div className="adm-header">
               <div>
                 <h1 className="adm-title">Docentes</h1>
-                <p className="adm-subtitle">Disponibilidades registradas en el sistema</p>
+                <p className="adm-subtitle">Registro de profesores y su disponibilidad</p>
+              </div>
+              <div className="adm-header-actions">
+                <button className="adm-btn-new" onClick={() => setShowNuevoDocente(true)}>
+                  + Nuevo docente
+                </button>
               </div>
             </div>
+
+            {/* Tabla de docentes registrados (alta / credenciales) */}
+            <div className="adm-table-card" style={{ marginBottom: 20 }}>
+              <div className="adm-table-header">
+                <h2 className="adm-section-title">Docentes registrados</h2>
+              </div>
+              {errorDocentesLista && !loadingDocentesLista && (
+                <div className="adm-alerta adm-alerta-error" style={{ margin: "0 20px 12px" }}>
+                  <span>⚠ {errorDocentesLista}</span>
+                  <button className="adm-alerta-close" onClick={cargarDocentesLista}>↻ Reintentar</button>
+                </div>
+              )}
+              {loadingDocentesLista ? (
+                <div className="adm-loading">
+                  <div className="adm-spinner" />
+                  <span>Cargando docentes…</span>
+                </div>
+              ) : (
+                <div className="adm-table-scroll">
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>Docente</th>
+                        <th>Curso</th>
+                        <th>Email</th>
+                        <th>Estado</th>
+                        <th>Credenciales</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docentesLista.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="adm-empty">
+                            Aún no hay docentes registrados
+                          </td>
+                        </tr>
+                      )}
+                      {docentesLista.map((d) => (
+                        <tr key={d.id}>
+                          <td><strong>{d.nombre} {d.apellido}</strong></td>
+                          <td>{d.curso || "—"}</td>
+                          <td>{d.email || "—"}</td>
+                          <td>
+                            <span className={`adm-estado ${d.activo ? "adm-estado-confirmada" : "adm-estado-pendiente"}`}>
+                              {d.activo ? "Activo" : "Inactivo"}
+                            </span>
+                          </td>
+                          <td>
+                            {d.tieneCredenciales ? (
+                              <span className="adm-credencial-si">✓ Tiene acceso</span>
+                            ) : (
+                              <span className="adm-credencial-no">Sin credenciales</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
             <div className="adm-table-card">
               <div className="adm-table-header">
-                <h2 className="adm-section-title">Lista de Docentes</h2>
+                <h2 className="adm-section-title">Disponibilidad configurada</h2>
               </div>
               {loadingDocentes ? (
                 <div className="adm-loading">
@@ -402,6 +807,90 @@ export default function AdminDashboard({ user, onLogout }) {
                             <span className={`adm-estado ${d.bloques > 0 ? "adm-estado-confirmada" : "adm-estado-pendiente"}`}>
                               {d.bloques > 0 ? `Configurada (${d.bloques} bloques)` : "Sin configurar"}
                             </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ════════ PADRES ════════ */}
+        {activeNav === "padres" && (
+          <div className="adm-wrap">
+            <div className="adm-header">
+              <div>
+                <h1 className="adm-title">Padres de familia</h1>
+                <p className="adm-subtitle">Registro de padres y sus hijos matriculados</p>
+              </div>
+              <div className="adm-header-actions">
+                <button className="adm-btn-new" onClick={() => setShowNuevoPadre(true)}>
+                  + Nuevo padre
+                </button>
+              </div>
+            </div>
+
+            <div className="adm-table-card">
+              <div className="adm-table-header">
+                <h2 className="adm-section-title">Lista de padres</h2>
+              </div>
+              {errorPadres && !loadingPadres && (
+                <div className="adm-alerta adm-alerta-error" style={{ margin: "0 20px 12px" }}>
+                  <span>⚠ {errorPadres}</span>
+                  <button className="adm-alerta-close" onClick={cargarPadres}>↻ Reintentar</button>
+                </div>
+              )}
+              {loadingPadres ? (
+                <div className="adm-loading">
+                  <div className="adm-spinner" />
+                  <span>Cargando padres de familia…</span>
+                </div>
+              ) : (
+                <div className="adm-table-scroll">
+                  <table className="adm-table">
+                    <thead>
+                      <tr>
+                        <th>DNI</th>
+                        <th>Padre / Madre</th>
+                        <th>Teléfono</th>
+                        <th>Horario laboral</th>
+                        <th>Hijos</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {padres.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="adm-empty">
+                            Aún no hay padres de familia registrados
+                          </td>
+                        </tr>
+                      )}
+                      {padres.map((p) => (
+                        <tr key={p.id}>
+                          <td>{p.dni}</td>
+                          <td><strong>{p.nombre} {p.apellido}</strong></td>
+                          <td>{p.telefono || "—"}</td>
+                          <td>{p.horarioLaboral || "—"}</td>
+                          <td>
+                            <div className="adm-hijos-cell">
+                              {(p.estudiantes || []).length === 0 && (
+                                <span className="adm-empty" style={{ padding: 0 }}>Sin hijos vinculados</span>
+                              )}
+                              {(p.estudiantes || []).map((h) => (
+                                <span key={h.id} className="adm-hijo-chip">
+                                  {h.nombre} {h.apellido}{h.grado ? ` · ${h.grado}${h.seccion ? h.seccion : ""}` : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td>
+                            <button className="adm-btn-link-add" onClick={() => setHijoModalPadre(p)}>
+                              + Agregar hijo
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -483,6 +972,36 @@ export default function AdminDashboard({ user, onLogout }) {
           </div>
         )}
       </div>
+
+      {/* ── Modales ── */}
+      {showNuevoDocente && (
+        <NuevoDocenteModal
+          onClose={() => setShowNuevoDocente(false)}
+          onCreated={() => {
+            setShowNuevoDocente(false);
+            cargarDocentesLista();
+          }}
+        />
+      )}
+      {showNuevoPadre && (
+        <NuevoPadreModal
+          onClose={() => setShowNuevoPadre(false)}
+          onCreated={() => {
+            setShowNuevoPadre(false);
+            cargarPadres();
+          }}
+        />
+      )}
+      {hijoModalPadre && (
+        <NuevoHijoModal
+          padre={hijoModalPadre}
+          onClose={() => setHijoModalPadre(null)}
+          onCreated={() => {
+            setHijoModalPadre(null);
+            cargarPadres();
+          }}
+        />
+      )}
     </div>
   );
 }

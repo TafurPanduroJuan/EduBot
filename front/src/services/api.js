@@ -171,3 +171,46 @@ export const actualizarEstadoCita = (id, estado) =>
     method: 'PATCH',
     body: JSON.stringify({ estado }),
   });
+
+/* ===================================================
+   PANEL ADMINISTRATIVO — GESTIÓN DE DOCENTES
+=================================================== */
+
+/**
+ * GET /api/panel/admin/docentes
+ * Lista todos los docentes registrados (incluye si ya tienen credenciales).
+ */
+export const listarDocentesAdmin = () =>
+  request('/panel/admin/docentes');
+
+/**
+ * POST /api/panel/admin/docentes
+ * Registra un nuevo docente y, opcionalmente, sus credenciales de acceso.
+ * body: { nombre, apellido, curso, email, crearCredenciales, username, password }
+ */
+export const crearDocenteAdmin = (body) =>
+  request('/panel/admin/docentes', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+/* ===================================================
+   PANEL ADMINISTRATIVO — GESTIÓN DE PADRES Y ESTUDIANTES
+=================================================== */
+
+export const listarPadresAdmin = () =>
+  request('/panel/admin/padres');
+
+
+export const crearPadreAdmin = (body) =>
+  request('/panel/admin/padres', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+
+export const crearEstudianteAdmin = (padreId, body) =>
+  request(`/panel/admin/padres/${padreId}/estudiantes`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
