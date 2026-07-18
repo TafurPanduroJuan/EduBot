@@ -75,6 +75,10 @@ public class AuthService {
             throw new RuntimeException("El username '" + username + "' ya existe");
         }
 
+        if (!usuarioRepo.findByDocenteId(docenteId).isEmpty()) {
+            throw new RuntimeException("Este docente ya tiene credenciales de acceso creadas");
+        }
+
         Docente docente = docenteRepo.findById(docenteId)
                 .orElseThrow(() -> new RuntimeException("Docente no encontrado: " + docenteId));
 

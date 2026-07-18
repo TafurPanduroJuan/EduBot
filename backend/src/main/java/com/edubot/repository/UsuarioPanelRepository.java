@@ -4,6 +4,7 @@ import com.edubot.model.UsuarioPanel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -13,5 +14,6 @@ public interface UsuarioPanelRepository extends JpaRepository<UsuarioPanel, Long
 
     boolean existsByUsername(String username);
 
-    Optional<UsuarioPanel> findByDocenteId(Long docenteId);
+
+    List<UsuarioPanel> findByDocenteId(Long docenteId);
 }

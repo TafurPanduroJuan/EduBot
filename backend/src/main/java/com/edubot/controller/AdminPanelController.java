@@ -159,10 +159,8 @@ public class AdminPanelController {
             m.put("curso", d.getCurso());
             m.put("email", d.getEmail());
             m.put("activo", d.isActivo());
-            usuarioPanelRepository.findByDocenteId(d.getId())
-                    .ifPresentOrElse(
-                            u -> m.put("tieneCredenciales", true),
-                            () -> m.put("tieneCredenciales", false));
+            boolean tieneCredenciales = !usuarioPanelRepository.findByDocenteId(d.getId()).isEmpty();
+            m.put("tieneCredenciales", tieneCredenciales);
             return m;
         }).collect(Collectors.toList());
         return ResponseEntity.ok(resultado);
